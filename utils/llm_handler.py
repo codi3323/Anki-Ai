@@ -1,11 +1,12 @@
 from google import genai
 from google.genai import types
 import os
+import openai
 
-# Global client holder (simple implementation)
 # Global client holders
 _PRIMARY_CLIENT = None
 _FALLBACK_CLIENTS = []
+_OPENROUTER_CLIENT = None
 
 def configure_gemini(api_key: str, fallback_keys: list = None):
     """Configures the Gemini API with provided primary and fallback keys."""
@@ -26,16 +27,30 @@ def configure_gemini(api_key: str, fallback_keys: list = None):
                  except: 
                     pass
 
+def configure_openrouter(api_key: str):
+    """Configures the OpenRouter API."""
+    global _OPENROUTER_CLIENT
+    if api_key and api_key.strip():
+        _OPENROUTER_CLIENT = openai.OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+    else:
+        _OPENROUTER_CLIENT = None
+
 import time
 
 def rate_limit_delay(model_name: str):
-    """Enforces rate limits: 30 RPM for Gemma, 10 RPM for Flash Lite, 5 RPM for others."""
+    """Enforces rate limits."""
     if "gemma" in model_name:
         delay = 2.0 # 30 RPM
     elif "flash-lite" in model_name:
         delay = 6.0 # 10 RPM
+    elif "free" in model_name:
+        delay = 3.0 # 20 RPM (Requested)
     else:
-        delay = 12.0 # 5 RPM
+        # Default safety
+        delay = 1.0 
     time.sleep(delay)
 
 def _generate_with_retry(model_name: str, contents, config, fallback_to_flash_lite: bool = False):
@@ -45,11 +60,7 @@ def _generate_with_retry(model_name: str, contents, config, fallback_to_flash_li
     global _PRIMARY_CLIENT, _FALLBACK_CLIENTS
     
     if not _PRIMARY_CLIENT:
-        # Compatibility check
-        if '_CLIENT' in globals() and globals()['_CLIENT']:
-             _PRIMARY_CLIENT = globals()['_CLIENT']
-        else:
-             raise ValueError("API Key not configured.")
+         raise ValueError("Google API Key not configured.")
         
     rate_limit_delay(model_name)
     
@@ -83,8 +94,6 @@ def _generate_with_retry(model_name: str, contents, config, fallback_to_flash_li
     # Triggered if all keys failed AND fallback enabled
     if fallback_to_flash_lite:
         try:
-            # Fallback uses Primary Key (assuming quota might be per-model or per-tier)
-            # Ideally we could rotate keys for this too, but for simplicity starts with Primary.
             return attempt(_PRIMARY_CLIENT, "gemini-2.5-flash-lite")
         except Exception as e3:
              errors.append(f"Flash Lite Fallback Error: {str(e3)}")
@@ -92,10 +101,98 @@ def _generate_with_retry(model_name: str, contents, config, fallback_to_flash_li
     # If we got here, everything failed.
     raise Exception(f"All attempts failed. Errors: {'; '.join(errors)}")
 
-def process_chunk_with_gemini(text_chunk: str, model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "") -> str:
+def _generate_with_openrouter(model_name: str, system_instruction: str, user_content: str):
+    """Generates content using OpenRouter."""
+    global _OPENROUTER_CLIENT
+    if not _OPENROUTER_CLIENT:
+        raise ValueError("OpenRouter API Key not configured.")
+
+    rate_limit_delay(model_name)
+
+    try:
+        response = _OPENROUTER_CLIENT.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=0.2,
+            max_tokens=4000
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        raise Exception(f"OpenRouter Error: {str(e)}")
+
+def get_chat_response(messages: list, context: str, provider: str, model_name: str) -> str:
     """
-    Sends a text chunk to Gemini Flash and retrieves Anki CSV cards.
+    Handles chat interaction with the document context.
+    messages: list of {"role": "user"|"assistant", "content": "..."}
     """
+    system_prompt = f"""You are a helpful Medical Assistant AI. 
+    Answer questions based strictly on the provided medical context.
+    
+    Context:
+    {context[:100000]} 
+    
+    (Context truncated to 100k chars for safety)
+    """
+    
+    if provider == "google":
+        global _PRIMARY_CLIENT
+        if not _PRIMARY_CLIENT: return "Error: Google Client not configured."
+        
+        # Convert messages to Gemini format (user/model)
+        gemini_hist = []
+        for m in messages:
+            role = "user" if m["role"] == "user" else "model"
+            gemini_hist.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
+            
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.7
+        )
+        
+        try:
+            # We use generate_content with the full history as contents, or chat session?
+            # Unified generate_content is stateless-ish but we can pass list of contents.
+            # But generate_content expects list of Content objects.
+            response = _generate_with_retry(model_name, gemini_hist, config)
+            return response.text
+        except Exception as e:
+            return f"Chat Error: {e}"
+
+    elif provider == "openrouter":
+        global _OPENROUTER_CLIENT
+        if not _OPENROUTER_CLIENT: return "Error: OpenRouter Client not configured."
+        
+        rate_limit_delay(model_name)
+        
+        # OpenRouter/OpenAI Format
+        # Prepend system prompt to messages
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+        
+        try:
+            response = _OPENROUTER_CLIENT.chat.completions.create(
+                model=model_name,
+                messages=full_messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            return f"Chat Error: {e}"
+    
+    return "Error: Invalid Provider"
+
+def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "") -> str:
+    """
+    Sends a text chunk to the selected Provider/Model and retrieves Anki CSV cards.
+    """
+    # ... (existing process_chunk logic implies calling _generate_with_openrouter or _generate_with_retry)
+    # The arguments have changed slightly in _generate_with_openrouter to include rate_limit, 
+    # but process_chunk calls it with (model, system, user).
+    # I need to ensure process_chunk stays compatible. I will re-include it fully or just the changed parts?
+    # Since I'm replacing a large block, I'll paste the full modified process_chunk and helpers below to be safe.
+    
     # Determine Rules based on settings
     length_instruction = ""
     if "Short" in card_length:
@@ -121,8 +218,7 @@ def process_chunk_with_gemini(text_chunk: str, model_name: str = "gemini-3-flash
     if custom_prompt:
         custom_instruction_str = f"9. USER OVERRIDE/ADDITION: {custom_prompt}"
 
-    config = types.GenerateContentConfig(
-        system_instruction=f"""You are an expert Medical Anki Card Generator.
+    system_instruction = f"""You are an expert Medical Anki Card Generator.
     
     Rules:
     1. Subject: Medical School (USMLE/High-Yield focus).
@@ -137,16 +233,24 @@ def process_chunk_with_gemini(text_chunk: str, model_name: str = "gemini-3-flash
     8. {density_instruction}
     9. {highlight_instruction}
     {custom_instruction_str}
-    """,
-        temperature=0.2,
-        max_output_tokens=65536,
-    )
+    """
 
     try:
-        response = _generate_with_retry(model_name, text_chunk, config, fallback_to_flash_lite=False)
+        if provider == "google":
+            config = types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.2,
+                max_output_tokens=65536,
+            )
+            response = _generate_with_retry(model_name, text_chunk, config, fallback_to_flash_lite=False)
+            text_resp = response.text
+        elif provider == "openrouter":
+            text_resp = _generate_with_openrouter(model_name, system_instruction, text_chunk)
+        else:
+             return "Error: Invalid Provider Selected"
         
         # Clean up response if it contains markdown code blocks
-        text = response.text.strip()
+        text = text_resp.strip()
         if text.startswith("```"):
             lines = text.splitlines()
             if lines[0].startswith("```"):
@@ -158,6 +262,9 @@ def process_chunk_with_gemini(text_chunk: str, model_name: str = "gemini-3-flash
         return text
     except Exception as e:
         return f"Error processing chunk: {str(e)}"
+
+# Keep older alias for compatibility if needed, or update app.py
+process_chunk_with_gemini = lambda *args, **kwargs: process_chunk(*args, provider="google", **kwargs)
 
 def analyze_toc_with_gemini(toc_text: str, model_name: str = "gemini-2.5-flash-lite") -> str:
     """Extracts chapter structure from text using Gemini."""
