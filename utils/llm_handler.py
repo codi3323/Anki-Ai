@@ -120,7 +120,7 @@ def process_chunk_with_gemini(text_chunk: str, model_name: str = "gemini-3-flash
     
     Rules:
     1. Subject: Medical School (USMLE/High-Yield focus).
-    2. Formatting: Use Markdown with KaTeX for math (e.g., $Ca^{{2+}}$ for inline, $$...$$ for block).
+    2. Formatting: Use strictly Markdown and HTML. Do NOT use LaTeX or KaTeX (no $ or $$). For math/chemistry, use HTML tags (e.g., <sup>, <sub>).
     3. CSV Structure: "Front"|"Back". Use a pipe | as a delimiter. WARNING: You MUST enclose EVERY field in double quotes. If a field contains a double quote, escape it by doubling it (" -> "").
     4. Content: Focus on pathophysiology, pharmacology (mechanism of action/side effects), and diagnostic gold standards. 
     5. Completeness: EVERY card MUST have a Question AND an Answer. Do not generate headers.
