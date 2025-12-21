@@ -19,3 +19,15 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Environment and Keys
+.env
+.env.*
+*.env
+*.key
+*.pem
+secrets.json
