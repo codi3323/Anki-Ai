@@ -10,7 +10,13 @@ _FALLBACK_CLIENTS = []
 def configure_gemini(api_key: str, fallback_keys: list = None):
     """Configures the Gemini API with provided primary and fallback keys."""
     global _PRIMARY_CLIENT, _FALLBACK_CLIENTS
-    _PRIMARY_CLIENT = genai.Client(api_key=api_key)
+    
+    # FIX: Only initialize if api_key is not empty
+    if api_key and api_key.strip():
+        _PRIMARY_CLIENT = genai.Client(api_key=api_key)
+    else:
+        _PRIMARY_CLIENT = None
+        
     _FALLBACK_CLIENTS = []
     if fallback_keys:
         for key in fallback_keys:

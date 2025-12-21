@@ -54,8 +54,8 @@ with st.sidebar:
             st.info(f"Using Fallback API Key 1 (Dev Mode)")
         else:
             st.error("No API Keys found (Custom or Fallback).")
-            # Configure with empty strict fallback to prevent crash until key provided
-            configure_gemini("", fallback_keys=[])
+            # FIX: Don't call configure_gemini with an empty string
+            configure_gemini(None, fallback_keys=[])
     
     st.divider()
     
