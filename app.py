@@ -65,10 +65,10 @@ with st.sidebar:
     
     # Model Selection with descriptions
     model_options = {
-        "gemini-2.5-flash-lite": "Flash 2.5 Lite - Fastest, best for simple extraction",
-        "gemini-3-flash-preview": "Flash 3.0 Preview - Balanced speed & reasoning",
-        "gemini-2.5-pro": "Pro 2.5 - High reasoning, best for complex content",
-        "gemini-3-pro-preview": "Pro 3.0 Preview - Experimental high intelligence"
+        "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite (Fastest, 10 RPM)",
+        "gemini-2.5-flash": "Gemini 2.5 Flash (Standard, 5 RPM)",
+        "gemini-3-flash": "Gemini 3.0 Flash (Smart & Contextual, 5 RPM)",
+        "gemma-3-27b-it": "Gemma 3 27B (High Throughput, 30 RPM)"
     }
     
     selected_model_key = st.selectbox(
