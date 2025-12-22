@@ -81,12 +81,11 @@ with st.sidebar:
                 api_key = None
                 configure_openrouter(None)
 
-        # OpenRouter Models (Free / Specific Request)
         model_options = {
-            "google/gemini-2.0-flash-exp:free": "Gemini 2.0 Flash Exp (Free)",
             "xiaomi/mimo-v2-flash:free": "Xiaomi Mimo V2 Flash (Free)",
+            "google/gemini-2.0-flash-exp:free": "Gemini 2.0 Flash Exp (Free)",
             "mistralai/devstral-2512:free": "Mistral Devstral 2512 (Free)",
-            "qwen/qwen3-coder:free": "Qwen 3 Coder (Free)", # Currently assuming valid ID or closest
+            "qwen/qwen3-coder:free": "Qwen 3 Coder (Free)",
             "google/gemma-3-27b-it:free": "Gemma 3 27B IT (Free)"
         }
     

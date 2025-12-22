@@ -128,13 +128,15 @@ def get_chat_response(messages: list, context: str, provider: str, model_name: s
     Handles chat interaction with the document context.
     messages: list of {"role": "user"|"assistant", "content": "..."}
     """
+    context_limit = 200000 if "xiaomi" in model_name.lower() else 100000
+    
     system_prompt = f"""You are a helpful Medical Assistant AI. 
     Answer questions based strictly on the provided medical context.
     
     Context:
-    {context[:100000]} 
+    {context[:context_limit]} 
     
-    (Context truncated to 100k chars for safety)
+    (Context truncated to {context_limit} chars for safety)
     """
     
     if provider == "google":
