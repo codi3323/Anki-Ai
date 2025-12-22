@@ -192,16 +192,11 @@ def get_chat_response(messages: list, context: str, provider: str, model_name: s
     
     return "Error: Invalid Provider"
 
-def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "") -> str:
+def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "", formatting_mode: str = "Markdown/HTML") -> str:
     """
     Sends a text chunk to the selected Provider/Model and retrieves Anki CSV cards.
+    formatting_mode: "Plain Text", "Markdown/HTML", or "LaTeX/KaTeX"
     """
-    # ... (existing process_chunk logic implies calling _generate_with_openrouter or _generate_with_retry)
-    # The arguments have changed slightly in _generate_with_openrouter to include rate_limit, 
-    # but process_chunk calls it with (model, system, user).
-    # I need to ensure process_chunk stays compatible. I will re-include it fully or just the changed parts?
-    # Since I'm replacing a large block, I'll paste the full modified process_chunk and helpers below to be safe.
-    
     # Determine Rules based on settings
     length_instruction = ""
     if "Short" in card_length:
@@ -225,13 +220,21 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
         
     custom_instruction_str = ""
     if custom_prompt:
-        custom_instruction_str = f"9. USER OVERRIDE/ADDITION: {custom_prompt}"
+        custom_instruction_str = f"10. USER OVERRIDE/ADDITION: {custom_prompt}"
+
+    # Formatting Mode Instructions
+    if formatting_mode == "Plain Text":
+        formatting_instruction = "Rule: Use ONLY plain text. No formatting (no bold, no italics, no HTML, no LaTeX). Suitable for Anki Basic cards."
+    elif formatting_mode == "LaTeX/KaTeX":
+        formatting_instruction = "Rule: Use LaTeX/KaTeX for math and chemistry (e.g., $H_2O$, $\\frac{1}{2}$). Use Markdown for text formatting (bold, italics). For Anki with MathJax."
+    else:  # Default: Markdown/HTML
+        formatting_instruction = "Rule: Use strictly Markdown and HTML. Do NOT use LaTeX or KaTeX (no $ or $$). For math/chemistry, use HTML tags (e.g., <sup>, <sub>)."
 
     system_instruction = f"""You are an expert Medical Anki Card Generator.
     
     Rules:
     1. Subject: Medical School (USMLE/High-Yield focus).
-    2. Formatting: Use strictly Markdown and HTML. Do NOT use LaTeX or KaTeX (no $ or $$). For math/chemistry, use HTML tags (e.g., <sup>, <sub>).
+    2. Formatting: {formatting_instruction}
     3. CSV Structure: "Front"|"Back". Use a pipe | as a delimiter. WARNING: You MUST enclose EVERY field in double quotes. If a field contains a double quote, escape it by doubling it (" -> "").
     4. Content: Focus on pathophysiology, pharmacology (mechanism of action/side effects), and diagnostic gold standards. 
     5. Completeness: EVERY card MUST have a Question AND an Answer. Do not generate headers.
@@ -246,6 +249,7 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
     9. {highlight_instruction}
     {custom_instruction_str}
     """
+
 
     try:
         if provider == "google":

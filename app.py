@@ -117,6 +117,7 @@ with col_gen:
         enable_highlighting = st.toggle("Highlight Key Terms (Bold)", value=True)
         custom_prompt = st.text_area("Custom Instructions", help="E.g., 'Focus on Pharmacology'")
         deck_type = st.radio("Deck Organization", ["Subdecks (Medical::Item)", "Tags Only (Deck: Medical, Tag: Item)", "Both"], help="Organization structure.")
+        formatting_mode = st.radio("Card Formatting", ["Plain Text", "Markdown/HTML", "LaTeX/KaTeX"], index=1, help="Plain Text = Basic cards. Markdown/HTML = styled. LaTeX/KaTeX = MathJax support.")
 
     uploaded_files = st.file_uploader("Upload Medical PDF(s)", type=["pdf"], accept_multiple_files=True, key="anki_uploader")
 
@@ -226,7 +227,8 @@ with col_gen:
                                 card_length=card_length,
                                 card_density=card_density,
                                 enable_highlighting=enable_highlighting,
-                                custom_prompt=custom_prompt
+                                custom_prompt=custom_prompt,
+                                formatting_mode=formatting_mode
                             )
                             
                             if csv_chunk and not csv_chunk.startswith("Error"):
@@ -281,7 +283,8 @@ with col_gen:
                                 card_length=card_length,
                                 card_density=card_density,
                                 enable_highlighting=enable_highlighting,
-                                custom_prompt=custom_prompt
+                                custom_prompt=custom_prompt,
+                                formatting_mode=formatting_mode
                             )
                             try:
                                 df_single = pd.read_csv(StringIO(csv_text), sep="|", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
