@@ -246,20 +246,24 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
         density_instruction = "Rule: DENSITY = EXTREME. Goal: Extract 20-50+ cards per chunk. Cover EVERY distinct fact, number, and mechanism."
 
     highlight_instruction = ""
-    if enable_highlighting:
-        highlight_instruction = "Rule: Use bold (**text**) to highlight the most high-yield keywords/associations in the Answer."
-        
-    custom_instruction_str = ""
-    if custom_prompt:
-        custom_instruction_str = f"10. USER OVERRIDE/ADDITION: {custom_prompt}"
-
+    
     # Formatting Mode Instructions
     if formatting_mode == "Basic + MathJax":
-        formatting_instruction = "Rule: Use plain text with MathJax for math/chemistry. Use \\\\( ... \\\\) for inline math and \\\\[ ... \\\\] for block math. Example: \\\\(H_2O\\\\), \\\\(\\\\frac{1}{2}\\\\). No Markdown. Works with default Anki."
+        formatting_instruction = "Rule: Use ONLY HTML tags for formatting. For bold use <b>text</b>, for italics use <i>text</i>, for superscript use <sup>text</sup>, for subscript use <sub>text</sub>. Do NOT use Markdown (no ** or *). Do NOT use LaTeX delimiters like $ or \\\\(. Keep it simple HTML that works in default Anki Basic cards."
+        if enable_highlighting:
+            highlight_instruction = "Rule: Use <b>text</b> to highlight the most high-yield keywords/associations in the Answer."
     elif formatting_mode == "Legacy LaTeX":
-        formatting_instruction = "Rule: Use Anki's legacy LaTeX format with [latex]...[/latex] tags for math. Example: [latex]H_2O[/latex], [latex]\\\\frac{1}{2}[/latex]. Use plain text otherwise."
+        formatting_instruction = "Rule: Use Anki's legacy LaTeX format with [latex]...[/latex] tags for math. Example: [latex]H_2O[/latex], [latex]\\\\frac{1}{2}[/latex]. Use plain text or simple HTML otherwise."
+        if enable_highlighting:
+            highlight_instruction = "Rule: Use <b>text</b> to highlight the most high-yield keywords in the Answer."
     else:  # Default: Markdown
         formatting_instruction = "Rule: Use Markdown for text formatting (bold with **text**, italics with *text*). For math/chemistry, use HTML tags (e.g., <sup>, <sub>). Do NOT use LaTeX."
+        if enable_highlighting:
+            highlight_instruction = "Rule: Use bold (**text**) to highlight the most high-yield keywords/associations in the Answer."
+
+    custom_instruction_str = ""
+    if custom_prompt:
+        custom_instruction_str = f"8. USER OVERRIDE/ADDITION: {custom_prompt}"
 
     system_instruction = f"""You are a world-class Anki flashcard creator that helps students create flashcards that help them remember facts, concepts, and ideas from videos. You will be given a video or document or snippet.
     
