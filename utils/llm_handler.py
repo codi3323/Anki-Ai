@@ -223,12 +223,12 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
         custom_instruction_str = f"10. USER OVERRIDE/ADDITION: {custom_prompt}"
 
     # Formatting Mode Instructions
-    if formatting_mode == "Plain Text":
-        formatting_instruction = "Rule: Use ONLY plain text. No formatting (no bold, no italics, no HTML, no LaTeX). Suitable for Anki Basic cards."
-    elif formatting_mode == "LaTeX/KaTeX":
-        formatting_instruction = "Rule: Use LaTeX/KaTeX for math and chemistry (e.g., $H_2O$, $\\frac{1}{2}$). Use Markdown for text formatting (bold, italics). For Anki with MathJax."
-    else:  # Default: Markdown/HTML
-        formatting_instruction = "Rule: Use strictly Markdown and HTML. Do NOT use LaTeX or KaTeX (no $ or $$). For math/chemistry, use HTML tags (e.g., <sup>, <sub>)."
+    if formatting_mode == "Basic + MathJax":
+        formatting_instruction = "Rule: Use plain text with MathJax for math/chemistry. Use \\\\( ... \\\\) for inline math and \\\\[ ... \\\\] for block math. Example: \\\\(H_2O\\\\), \\\\(\\\\frac{1}{2}\\\\). No Markdown. Works with default Anki."
+    elif formatting_mode == "Legacy LaTeX":
+        formatting_instruction = "Rule: Use Anki's legacy LaTeX format with [latex]...[/latex] tags for math. Example: [latex]H_2O[/latex], [latex]\\\\frac{1}{2}[/latex]. Use plain text otherwise."
+    else:  # Default: Markdown
+        formatting_instruction = "Rule: Use Markdown for text formatting (bold with **text**, italics with *text*). For math/chemistry, use HTML tags (e.g., <sup>, <sub>). Do NOT use LaTeX."
 
     system_instruction = f"""You are an expert Medical Anki Card Generator.
     

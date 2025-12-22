@@ -117,7 +117,7 @@ with col_gen:
         enable_highlighting = st.toggle("Highlight Key Terms (Bold)", value=True)
         custom_prompt = st.text_area("Custom Instructions", help="E.g., 'Focus on Pharmacology'")
         deck_type = st.radio("Deck Organization", ["Subdecks (Medical::Item)", "Tags Only (Deck: Medical, Tag: Item)", "Both"], help="Organization structure.")
-        formatting_mode = st.radio("Card Formatting", ["Plain Text", "Markdown/HTML", "LaTeX/KaTeX"], index=1, help="Plain Text = Basic cards. Markdown/HTML = styled. LaTeX/KaTeX = MathJax support.")
+        formatting_mode = st.radio("Card Formatting", ["Basic + MathJax", "Markdown", "Legacy LaTeX"], index=0, help="Basic + MathJax = works with default Anki. Markdown = styled text. Legacy LaTeX = [latex]...[/latex] tags.")
 
     uploaded_files = st.file_uploader("Upload Medical PDF(s)", type=["pdf"], accept_multiple_files=True, key="anki_uploader")
 
