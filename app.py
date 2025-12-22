@@ -233,7 +233,7 @@ with col_gen:
                             
                             if csv_chunk and not csv_chunk.startswith("Error"):
                                 try:
-                                    df_chunk = pd.read_csv(StringIO(csv_chunk), sep="|", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
+                                    df_chunk = pd.read_csv(StringIO(csv_chunk), sep="\t", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
                                     clean_title = chapter['title'].replace(" ", "_").replace(":", "-")
                                     if "Subdecks" in deck_type:
                                         df_chunk["Deck"] = f"Medical::{clean_title}"
@@ -252,7 +252,10 @@ with col_gen:
                         final_df = pd.concat(all_dfs, ignore_index=True)
                         final_df = final_df[["Front", "Back", "Deck", "Tag"]]
                         st.session_state['result_df'] = final_df
-                        st.session_state['result_csv'] = final_df.to_csv(sep="|", index=False, header=False, quoting=1)
+                        # Create proper Anki TSV with header comments
+                        anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
+                        tsv_content = final_df.to_csv(sep="\t", index=False, header=False, quoting=1)
+                        st.session_state['result_csv'] = anki_header + tsv_content
                         st.success(f"Generated {len(final_df)} cards!")
                     else:
                         st.error("No cards generated. Check errors above.")
@@ -261,7 +264,7 @@ with col_gen:
 
             if 'result_df' in st.session_state:
                 st.dataframe(st.session_state['result_df'], width='stretch')
-                st.download_button("Download .csv", st.session_state['result_csv'], "anki_cards.csv", "text/csv")
+                st.download_button("Download anki_cards.txt", st.session_state['result_csv'], "anki_cards.txt", "text/plain")
             
             st.divider()
             
@@ -287,12 +290,16 @@ with col_gen:
                                 formatting_mode=formatting_mode
                             )
                             try:
-                                df_single = pd.read_csv(StringIO(csv_text), sep="|", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
+                                df_single = pd.read_csv(StringIO(csv_text), sep="\t", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
                                 st.success(f"Generated {len(df_single)} cards!")
                                 st.dataframe(df_single)
-                                # Allow download
-                                single_csv = df_single.to_csv(sep="|", index=False, header=False, quoting=1)
-                                st.download_button(f"Download {ch['title']}.csv", single_csv, f"{ch['title']}.csv", "text/csv", key=f"dl_{idx}")
+                                # Allow download with Anki header
+                                clean_title = ch['title'].replace(" ", "_").replace(":", "-")
+                                df_single["Deck"] = f"Medical::{clean_title}"
+                                df_single["Tag"] = clean_title
+                                anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
+                                single_tsv = anki_header + df_single.to_csv(sep="\t", index=False, header=False, quoting=1)
+                                st.download_button(f"Download {ch['title']}.txt", single_tsv, f"{clean_title}.txt", "text/plain", key=f"dl_{idx}")
                             except Exception as e:
                                 st.error(f"Parsing Error: {e}")
                                 if developer_mode: st.code(csv_text)

@@ -271,9 +271,9 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
 
     Rules:
     1. Formatting: {formatting_instruction}
-    2. CSV Structure: "Front"|"Back". Use a pipe | as a delimiter. WARNING: You MUST enclose EVERY field in double quotes. If a field contains a double quote, escape it by doubling it (" -> "").
+    2. TSV Structure: "Front"[TAB]"Back". Use a TAB character as the delimiter (not pipe, not comma). Enclose EVERY field in double quotes. If a field contains a double quote, escape it by doubling it (" -> "").
     3. Completeness: EVERY card MUST have a Question (Front) AND an Answer (Back). Do not generate headers.
-    4. Strictness: Output ONLY the CSV content. No code fences. One card per line.
+    4. Strictness: Output ONLY the TSV content. No code fences. One card per line.
     
     
     
