@@ -329,17 +329,26 @@ def sort_files_with_gemini(file_names: list[str], model_name: str = "gemma-3-27b
         return file_names
 
 def generate_chapter_summary(text_chunk: str, model_name: str = "gemma-3-27b-it") -> str:
-    """Generates a brief summary of a chapter."""
+    """Generates a brief summary of a chapter. Supports Google and OpenRouter."""
     input_text = text_chunk[:30000] 
     
+    prompt = f"Summarize the following medical text in 3-5 concise sentences. Focus on high-yield pathologies and mechanisms.\n\nText:\n{input_text}"
+    
     try:
-        response = _generate_with_retry(
-            model_name,
-            f"Summarize the following medical text in 3-5 concise sentences. Focus on high-yield pathologies and mechanisms.\n\nText:\n{input_text}",
-            types.GenerateContentConfig(temperature=0.2),
-            fallback_to_flash_lite=True
-        )
-        return response.text
+        # Detect provider from model name (OpenRouter models have "/" in the name)
+        if "/" in model_name:
+            # OpenRouter
+            system_instruction = "You are a Medical Text Summarizer. Be concise and focus on high-yield medical facts."
+            return _generate_with_openrouter(model_name, system_instruction, prompt)
+        else:
+            # Google/Gemini
+            response = _generate_with_retry(
+                model_name,
+                prompt,
+                types.GenerateContentConfig(temperature=0.2),
+                fallback_to_flash_lite=True
+            )
+            return response.text
     except Exception as e:
         return f"Summary failed: {str(e)}"
 

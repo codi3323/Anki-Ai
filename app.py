@@ -60,6 +60,7 @@ with st.sidebar:
             "gemini-3-flash": "Gemini 3.0 Flash (Smarter, 5 RPM)",
             "gemma-3-27b-it": "Gemma 3 27B (High Throughput, 30 RPM)"
         }
+        summary_model = "gemma-3-27b-it" # For Google: use Gemma
     
     else: # OpenRouter
         st.markdown("[Get OpenRouter Key](https://openrouter.ai/keys)")
@@ -88,6 +89,7 @@ with st.sidebar:
             "qwen/qwen3-coder:free": "Qwen 3 Coder (Free)",
             "google/gemma-3-27b-it:free": "Gemma 3 27B IT (Free)"
         }
+        summary_model = "google/gemini-2.0-flash-exp:free" # For OpenRouter: use Gemini 2.0 Free
     
     selected_model_key = st.selectbox(
         "Model", 
@@ -101,9 +103,9 @@ with st.sidebar:
     chunk_size = st.slider("Chunk Size (chars)", 5000, 20000, 10000, step=1000)
     developer_mode = st.toggle("Developer Mode", value=False)
 
-# Tabs Removed - Split View
+# Split View
 st.divider()
-col_gen, col_chat = st.columns([5, 4]) # 5/9 Gen, 4/9 Chat
+col_gen, col_chat = st.columns([5, 4])
 
 # ==================== ANKI GENERATOR COLUMN ====================
 with col_gen:
@@ -119,10 +121,8 @@ with col_gen:
     uploaded_files = st.file_uploader("Upload Medical PDF(s)", type=["pdf"], accept_multiple_files=True, key="anki_uploader")
 
     if uploaded_files and api_key:
-        is_multi_file = len(uploaded_files) > 1
-        
         # Processing Logic
-        if st.button("Process Files", type="secondary"):
+        if st.button("Process Files & Generate Summaries", type="secondary"):
              with st.spinner("Processing files..."):
                 file_map = {f.name: f for f in uploaded_files}
                 sorted_names = list(file_map.keys())
@@ -132,25 +132,39 @@ with col_gen:
                 
                 for idx, name in enumerate(sorted_names):
                     if name in file_map:
-                        progress_text.text(f"Processing and Extracting text from {name}...")
+                        progress_text.text(f"Extracting text from {name}...")
                         f = file_map[name]
                         text = extract_text_from_pdf(f)
                         fname = f.name.replace(".pdf", "").replace("_", " ").title()
                         
+                        # Generate Summary
+                        progress_text.text(f"Summarizing {name}...")
+                        try:
+                            summary = generate_chapter_summary(text, model_name=summary_model)
+                        except:
+                            summary = "(Summary generation failed)"
+                        
                         file_chapters.append({
                             "title": fname,
                             "text": text,
-                            "summary": ""
+                            "summary": summary
                         })
                 
                 st.session_state['chapters_data'] = file_chapters
                 st.toast(f"Processed {len(file_chapters)} files", icon="📚")
         
-        # Editor & Generation
+        # Show Data & Generate
         if 'chapters_data' in st.session_state and st.session_state['chapters_data']:
             st.divider()
             
-            # Global Gen Button (Top Level for Access)
+            # Document Summary
+            with st.expander("📄 Document Summary", expanded=True):
+                for ch in st.session_state['chapters_data']:
+                    st.markdown(f"**{ch['title']}:** {ch['summary']}")
+            
+            st.divider()
+
+            # Global Gen Button
             if st.button("⚡ Generate All Anki Cards", type="primary"):
                 try:
                     total_chapters = len(st.session_state['chapters_data'])
@@ -184,7 +198,6 @@ with col_gen:
                                 try:
                                     df_chunk = pd.read_csv(StringIO(csv_chunk), sep="|", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
                                     clean_title = chapter['title'].replace(" ", "_").replace(":", "-")
-                                    # Tags Logic
                                     if "Subdecks" in deck_type:
                                         df_chunk["Deck"] = f"Medical::{clean_title}"
                                         df_chunk["Tag"] = ""
@@ -203,7 +216,9 @@ with col_gen:
                         final_df = final_df[["Front", "Back", "Deck", "Tag"]]
                         st.session_state['result_df'] = final_df
                         st.session_state['result_csv'] = final_df.to_csv(sep="|", index=False, header=False, quoting=1)
-                        st.success("Batch Processing Complete!")
+                        st.success(f"Generated {len(final_df)} cards!")
+                    else:
+                        st.error("No cards generated. Check errors above.")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
@@ -213,10 +228,37 @@ with col_gen:
             
             st.divider()
             
+            # Individual Chapter Expanders with Single-Gen Button
             for idx, ch in enumerate(st.session_state['chapters_data']):
-                with st.expander(f"File: {ch['title']}", expanded=False):
+                with st.expander(f"📁 {ch['title']}", expanded=False):
                     new_title = st.text_input(f"Title", value=ch['title'], key=f"title_{idx}")
-                    st.text_area(f"Content", value=ch['text'][:500]+"...", disabled=True, height=100)
+                    st.caption(f"Summary: {ch['summary']}")
+                    st.text_area(f"Content Preview", value=ch['text'][:500]+"...", disabled=True, height=100)
+                    
+                    # Single Chapter Generation
+                    if st.button(f"⚡ Generate Cards for this Chapter", key=f"gen_single_{idx}"):
+                         with st.spinner(f"Generating for {ch['title']}..."):
+                            provider_code = "google" if provider == "Google Gemini" else "openrouter"
+                            csv_text = process_chunk(
+                                ch['text'], 
+                                provider=provider_code,
+                                model_name=model_name,
+                                card_length=card_length,
+                                card_density=card_density,
+                                enable_highlighting=enable_highlighting,
+                                custom_prompt=custom_prompt
+                            )
+                            try:
+                                df_single = pd.read_csv(StringIO(csv_text), sep="|", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
+                                st.success(f"Generated {len(df_single)} cards!")
+                                st.dataframe(df_single)
+                                # Allow download
+                                single_csv = df_single.to_csv(sep="|", index=False, header=False, quoting=1)
+                                st.download_button(f"Download {ch['title']}.csv", single_csv, f"{ch['title']}.csv", "text/csv", key=f"dl_{idx}")
+                            except Exception as e:
+                                st.error(f"Parsing Error: {e}")
+                                if developer_mode: st.code(csv_text)
+                    
                     if new_title != ch['title']:
                         st.session_state['chapters_data'][idx]['title'] = new_title
 
@@ -225,24 +267,20 @@ with col_chat:
     st.subheader("2. Chat with PDF")
     
     if 'chapters_data' not in st.session_state or not st.session_state['chapters_data']:
-        st.info("Uploaded files will appear here for chat.")
+        st.info("Upload and process files to enable chat.")
     else:
-        # Build Context
         all_text_context = "\n\n".join([c['text'] for c in st.session_state['chapters_data']])
         st.caption(f"Context: {len(st.session_state['chapters_data'])} files loaded.")
         
-        # Init Chat History
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
-        # Chat Container
         chat_container = st.container(height=600)
         with chat_container:
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        # Chat Input
         if prompt := st.chat_input("Ask about the PDFs...", key="chat_input_widget"):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with chat_container:
