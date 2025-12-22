@@ -1,53 +1,33 @@
-# Medical PDF to Anki Converter
+# Medical PDF to Anki Converter (AI-Powered)
 
-A powerful tool to convert medical PDFs into Anki-ready CSV cards using Google Gemini 3 Flash (or 1.5 Flash).
+A comprehensive tool to convert medical PDFs into high-yield Anki cards using state-of-the-art AI models (Google Gemini & OpenRouter).
 
-## 🚀 Getting Started
+## 🚀 Key Features
 
-Since Python was not detected on your system, we've provided a Docker setup for easy execution.
+*   **Dual AI Providers**: Support for **Google Gemini** (1.5, 2.0, 3.0) and **OpenRouter** (Xiaomi Mimo, DeepSeek, Qwen).
+*   **Split-View Interface**: Generate Anki cards on the left while chatting with your PDF context on the right.
+*   **AI Summaries**: Automatically generates high-yield summaries for every uploaded PDF file/chapter.
+*   **Infinite Throughput**: Built-in rate limiting and key rotation (for Gemini) to handle massive textbooks.
+*   **High Density**: Optimized prompts for "Extreme Density" card generation (30-50+ cards per chunk).
+*   **Anki Ready**: Outputs Pipe-separated (`|`) CSV files with HTML/Markdown support, ready for immediate Anki import.
 
-### Option 1: Using Docker (Recommended if Python is missing)
+## 🛠 Getting Started
 
-1.  Make sure you have **Docker Desktop** installed and running.
-2.  Open your terminal in this directory.
-3.  Run the following command:
-    ```bash
-    docker-compose up --build
-    ```
-4.  Open your browser to: http://localhost:8501
+### Option 1: Using Docker
+1.  Make sure you have **Docker Desktop** installed.
+2.  Run: `docker-compose up --build`
+3.  Access: http://localhost:8501
 
-### Option 2: Manual Setup (from GitHub)
+### Option 2: Manual Setup
+1.  **Clone & Enter**: `git clone <repo> && cd <repo>`
+2.  **Environment**: Create a venv and activate it.
+3.  **Install**: `pip install -r requirements.txt`
+4.  **Launch**: `streamlit run app.py`
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/anki-ai.git
-    cd anki-ai
-    ```
+## 🧪 Model Recommendations
 
-2.  **Create a Virtual Environment (Recommended):**
-    ```bash
-    # Windows
-    python -m venv venv
-    .\venv\Scripts\activate
+*   **Anki Generation**: `xiaomi/mimo-v2-flash` (OpenRouter) or `gemini-3-flash` (Google).
+*   **Summaries & Chat**: `google/gemini-2.0-flash-exp:free` or `gemma-3-27b-it`.
 
-    # macOS/Linux
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-
-3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **Run the app:**
-    ```bash
-    streamlit run app.py
-    ```
-
-## 🛠 Features
-
-*   **PDF Parsing**: Extracts text from medical text books.
-*   **Smart Chunking**: Splits large texts into 10k character windows.
-*   **Gemini Integration**: Uses any gemmini for high-speed, cost-effective generation.
-*   **Anki Formatting**: Outputs `;` separated values safe for Anki import.
+---
+*Developed for USMLE and Medical Students focus.*

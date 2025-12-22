@@ -303,7 +303,7 @@ def analyze_toc_with_gemini(toc_text: str, model_name: str = "gemini-2.5-flash-l
         return f"Error analyzing TOC: {str(e)}"
 
 def sort_files_with_gemini(file_names: list[str], model_name: str = "gemma-3-27b-it") -> list[str]:
-    """Sorts a list of filenames logically using Gemma 3 27B IT."""
+    """Sorts a list of filenames logically. Supports Google and OpenRouter."""
     prompt = f"""Sort the following list of filenames in the most logical chronological or numerical order (e.g. Lecture 1 before Lecture 2, Chapter 1 before 10).
     
     Input List:
@@ -314,14 +314,22 @@ def sort_files_with_gemini(file_names: list[str], model_name: str = "gemma-3-27b
     """
 
     try:
-        response = _generate_with_retry(
-            model_name,
-            prompt,
-            types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0),
-            fallback_to_flash_lite=False 
-        )
         import json
-        sorted_list = json.loads(response.text)
+        if "/" in model_name:
+            # OpenRouter
+            system_instruction = "You are a File Organizer. Output strictly valid JSON."
+            resp_text = _generate_with_openrouter(model_name, system_instruction, prompt)
+        else:
+            # Google
+            response = _generate_with_retry(
+                model_name,
+                prompt,
+                types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0),
+                fallback_to_flash_lite=False 
+            )
+            resp_text = response.text
+            
+        sorted_list = json.loads(resp_text)
         if len(sorted_list) == len(file_names):
             return sorted_list
         return file_names
@@ -335,7 +343,6 @@ def generate_chapter_summary(text_chunk: str, model_name: str = "gemma-3-27b-it"
     prompt = f"Summarize the following medical text in 3-5 concise sentences. Focus on high-yield pathologies and mechanisms.\n\nText:\n{input_text}"
     
     try:
-        # Detect provider from model name (OpenRouter models have "/" in the name)
         if "/" in model_name:
             # OpenRouter
             system_instruction = "You are a Medical Text Summarizer. Be concise and focus on high-yield medical facts."
@@ -353,15 +360,23 @@ def generate_chapter_summary(text_chunk: str, model_name: str = "gemma-3-27b-it"
         return f"Summary failed: {str(e)}"
 
 def generate_full_summary(chapter_summaries: list[str], model_name: str = "gemma-3-27b-it") -> str:
-    """Aggregates chapter summaries into a document abstract."""
+    """Aggregates chapter summaries into a document abstract. Supports Google and OpenRouter."""
     joined_summaries = "\n- ".join(chapter_summaries)
+    prompt = f"Create a coherent summary/abstract of the entire document based on these chapter summaries:\n\n- {joined_summaries}"
+    
     try:
-        response = _generate_with_retry(
-            model_name,
-            f"Create a coherent summary/abstract of the entire document based on these chapter summaries:\n\n- {joined_summaries}",
-            types.GenerateContentConfig(temperature=0.2),
-            fallback_to_flash_lite=True
-        )
-        return response.text
+        if "/" in model_name:
+            # OpenRouter
+            system_instruction = "You are a Medical Literature Abstractor."
+            return _generate_with_openrouter(model_name, system_instruction, prompt)
+        else:
+            # Google
+            response = _generate_with_retry(
+                model_name,
+                prompt,
+                types.GenerateContentConfig(temperature=0.2),
+                fallback_to_flash_lite=True
+            )
+            return response.text
     except Exception as e:
         return f"Full summary failed: {str(e)}"
