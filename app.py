@@ -224,7 +224,7 @@ with col_gen:
                     st.error(f"Error: {e}")
 
             if 'result_df' in st.session_state:
-                st.dataframe(st.session_state['result_df'], use_container_width=True)
+                st.dataframe(st.session_state['result_df'], width='stretch')
                 st.download_button("Download .csv", st.session_state['result_csv'], "anki_cards.csv", "text/csv")
             
             st.divider()
