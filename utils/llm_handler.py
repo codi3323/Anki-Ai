@@ -117,7 +117,7 @@ def _generate_with_openrouter(model_name: str, system_instruction: str, user_con
                 {"role": "user", "content": user_content}
             ],
             temperature=0.2,
-            max_tokens=4000
+            max_tokens=16000
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -208,7 +208,7 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
     elif "High" in card_density:
         density_instruction = "Rule: DENSITY = HIGH. Generate comprehensive cards covering EVERY detail, mechanism, and fact in the text."
     else:
-        density_instruction = "Rule: DENSITY = NORMAL. Generate a balanced set of cards covering main points and important details."
+        density_instruction = "Rule: DENSITY = EXTREME. Goal: Extract 20-50+ cards per chunk. Cover EVERY distinct fact, number, and mechanism."
 
     highlight_instruction = ""
     if enable_highlighting:
@@ -227,6 +227,9 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
     4. Content: Focus on pathophysiology, pharmacology (mechanism of action/side effects), and diagnostic gold standards. 
     5. Completeness: EVERY card MUST have a Question AND an Answer. Do not generate headers.
     6. Strictness: Output ONLY the CSV content. No code fences. One card per line.
+    
+    CRITICAL INSTRUCTION: GENERATE AS MANY CARDS AS POSSIBLE.
+    Target: 30-50 cards for this text chunk. Do not summarize. Convert every fact into a card.
     
     Custom Preferences:
     7. {length_instruction}

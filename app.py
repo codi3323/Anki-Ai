@@ -102,12 +102,14 @@ with st.sidebar:
     chunk_size = st.slider("Chunk Size (chars)", 5000, 20000, 10000, step=1000)
     developer_mode = st.toggle("Developer Mode", value=False)
 
-# Tabs
-tab_gen, tab_chat = st.tabs(["🃏 Anki Generator", "💬 Chat with PDF"])
+# Tabs Removed - Split View
+st.divider()
+col_gen, col_chat = st.columns([5, 4]) # 5/9 Gen, 4/9 Chat
 
-# ==================== ANKI GENERATOR TAB ====================
-with tab_gen:
-    st.subheader("Card Generation Config")
+# ==================== ANKI GENERATOR COLUMN ====================
+with col_gen:
+    st.subheader("1. Card Generator")
+    
     with st.expander("Formatting Options", expanded=False):
         card_length = st.select_slider("Answer Length", options=["Short (1-2 words)", "Medium (Standard)", "Long (Conceptual)"], value="Medium (Standard)")
         card_density = st.select_slider("Card Count / Density", options=["Low (Key Concepts)", "Normal", "High (Comprehensive)"], value="Normal")
@@ -115,14 +117,13 @@ with tab_gen:
         custom_prompt = st.text_area("Custom Instructions", help="E.g., 'Focus on Pharmacology'")
         deck_type = st.radio("Deck Organization", ["Subdecks (Medical::Item)", "Tags Only (Deck: Medical, Tag: Item)", "Both"], help="Organization structure.")
 
-    st.divider()
     uploaded_files = st.file_uploader("Upload Medical PDF(s)", type=["pdf"], accept_multiple_files=True, key="anki_uploader")
 
     if uploaded_files and api_key:
         is_multi_file = len(uploaded_files) > 1
         
         # Processing Logic
-        if st.button("1. Process Files", type="secondary"):
+        if st.button("Process Files", type="secondary"):
              with st.spinner("Processing files..."):
                 file_map = {f.name: f for f in uploaded_files}
                 sorted_names = list(file_map.keys())
@@ -137,9 +138,6 @@ with tab_gen:
                         text = extract_text_from_pdf(f)
                         fname = f.name.replace(".pdf", "").replace("_", " ").title()
                         
-                        # AI Summary (Optional - can be slow)
-                        # summary = generate_chapter_summary(text)
-                        
                         file_chapters.append({
                             "title": fname,
                             "text": text,
@@ -151,36 +149,10 @@ with tab_gen:
         
         # Editor & Generation
         if 'chapters_data' in st.session_state and st.session_state['chapters_data']:
-            st.subheader("Edit & Generate")
-            
-            for idx, ch in enumerate(st.session_state['chapters_data']):
-                with st.expander(f"File/Chapter {idx+1}: {ch['title']}", expanded=False):
-                    new_title = st.text_input(f"Title", value=ch['title'], key=f"title_{idx}")
-                    st.text_area(f"Content", value=ch['text'][:500]+"...", disabled=True, height=100)
-                    
-                    if st.button(f"⚡ Generate Cards ({provider})", key=f"gen_{idx}"):
-                         with st.spinner(f"Generating with {model_name}..."):
-                            csv_text = process_chunk(
-                                ch['text'], 
-                                provider="google" if provider == "Google Gemini" else "openrouter",
-                                model_name=model_name,
-                                card_length=card_length,
-                                card_density=card_density,
-                                enable_highlighting=enable_highlighting,
-                                custom_prompt=custom_prompt
-                            )
-                            # Parse & Show
-                            try:
-                                df_single = pd.read_csv(StringIO(csv_text), sep="|", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
-                                st.success(f"Generated {len(df_single)} cards!")
-                                st.dataframe(df_single)
-                            except: st.error("Parsing failed.")
-                    
-                    if new_title != ch['title']:
-                        st.session_state['chapters_data'][idx]['title'] = new_title
-
             st.divider()
-            if st.button("2. Generate All Anki Cards", type="primary"):
+            
+            # Global Gen Button (Top Level for Access)
+            if st.button("⚡ Generate All Anki Cards", type="primary"):
                 try:
                     total_chapters = len(st.session_state['chapters_data'])
                     all_dfs = []
@@ -236,49 +208,61 @@ with tab_gen:
                 except Exception as e:
                     st.error(f"Error: {e}")
 
-    if 'result_df' in st.session_state:
-        st.subheader("Preview")
-        st.dataframe(st.session_state['result_df'], use_container_width=True)
-    if 'result_csv' in st.session_state:
-        st.download_button("Download .csv", st.session_state['result_csv'], "anki_cards.csv", "text/csv")
+            if 'result_df' in st.session_state:
+                st.dataframe(st.session_state['result_df'], use_container_width=True)
+                st.download_button("Download .csv", st.session_state['result_csv'], "anki_cards.csv", "text/csv")
+            
+            st.divider()
+            
+            for idx, ch in enumerate(st.session_state['chapters_data']):
+                with st.expander(f"File: {ch['title']}", expanded=False):
+                    new_title = st.text_input(f"Title", value=ch['title'], key=f"title_{idx}")
+                    st.text_area(f"Content", value=ch['text'][:500]+"...", disabled=True, height=100)
+                    if new_title != ch['title']:
+                        st.session_state['chapters_data'][idx]['title'] = new_title
 
-# ==================== CHAT TAB ====================
-with tab_chat:
-    st.header("💬 Chat with Document")
+# ==================== CHAT COLUMN ====================
+with col_chat:
+    st.subheader("2. Chat with PDF")
     
     if 'chapters_data' not in st.session_state or not st.session_state['chapters_data']:
-        st.info("Please upload and process files in the 'Anki Generator' tab first to build the context.")
+        st.info("Uploaded files will appear here for chat.")
     else:
         # Build Context
         all_text_context = "\n\n".join([c['text'] for c in st.session_state['chapters_data']])
-        st.caption(f"Context Loaded: {len(st.session_state['chapters_data'])} chapters/files. ({len(all_text_context)} chars)")
+        st.caption(f"Context: {len(st.session_state['chapters_data'])} files loaded.")
         
         # Init Chat History
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
-        # Display Chat
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+        # Chat Container
+        chat_container = st.container(height=600)
+        with chat_container:
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
 
         # Chat Input
-        if prompt := st.chat_input("Ask a question about your PDF..."):
+        if prompt := st.chat_input("Ask about the PDFs...", key="chat_input_widget"):
             st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+            with chat_container:
+                with st.chat_message("user"):
+                    st.markdown(prompt)
 
-            with st.chat_message("assistant"):
-                provider_code = "google" if provider == "Google Gemini" else "openrouter"
-                response = get_chat_response(
-                    st.session_state.messages, 
-                    all_text_context, 
-                    provider_code, 
-                    model_name
-                )
-                st.markdown(response)
+                with st.chat_message("assistant"):
+                    provider_code = "google" if provider == "Google Gemini" else "openrouter"
+                    with st.spinner("Thinking..."):
+                        response = get_chat_response(
+                            st.session_state.messages, 
+                            all_text_context, 
+                            provider_code, 
+                            model_name
+                        )
+                    st.markdown(response)
             
             st.session_state.messages.append({"role": "assistant", "content": response})
+            st.rerun()
 
 if not api_key:
     st.toast("⚠️ API Key not configured")
