@@ -164,8 +164,8 @@ with col_gen:
                             text = extract_text_from_pdf(f)
                             
                             progress_text.text(f"Detecting chapters in {name} using AI...")
-                            # Use text-based chapter detection with the summarizing model
-                            detected_chapters = detect_chapters_in_text(text, fname, model_name=summary_model)
+                            # Use text-based chapter detection with the normal model (same as Anki cards)
+                            detected_chapters = detect_chapters_in_text(text, fname, model_name=model_name)
                             
                             if detected_chapters:
                                 progress_text.text(f"Splitting {name} into {len(detected_chapters)} chapters...")

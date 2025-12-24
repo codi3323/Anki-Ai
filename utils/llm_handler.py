@@ -472,8 +472,8 @@ def detect_chapters_in_text(text: str, file_name: str, model_name: str = "gemma-
     Detects chapters within a text document using AI.
     Returns: [{"title": "Chapter 1 Name", "description": "..."}, ...]
     """
-    # Truncate to first 50000 chars for analysis
-    sample_text = text[:50000]
+    # Use up to 200k chars for complete analysis
+    sample_text = text[:200000]
     
     prompt = f"""Analyze this document text and identify distinct chapters or major sections.
 
