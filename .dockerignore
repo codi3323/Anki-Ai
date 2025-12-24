@@ -1,0 +1,11 @@
+
+.env
+venv
+__pycache__
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+README.md
+old_files/
+tmp/

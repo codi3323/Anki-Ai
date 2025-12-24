@@ -223,10 +223,30 @@ def get_chat_response(messages: list, context: str, provider: str, model_name: s
     
     return "Error: Invalid Provider"
 
-def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "", formatting_mode: str = "Markdown/HTML") -> str:
+def get_embedding(text: str, provider: str = "google", model_name: str = "text-embedding-004") -> list:
+    """Generates an embedding vector for the given text."""
+    try:
+        if provider == "google":
+            global _PRIMARY_CLIENT
+            if not _PRIMARY_CLIENT: return []
+            result = _PRIMARY_CLIENT.models.embed_content(
+                model=model_name,
+                contents=text
+            )
+            return result.embeddings[0].values
+        elif provider == "openrouter":
+            # OpenRouter might support embeddings, but it's variable.
+            return [] 
+    except Exception as e:
+        print(f"Embedding check failed: {e}")
+        return []
+
+
+def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "", formatting_mode: str = "Markdown/HTML", existing_topics: list[str] = None) -> str:
     """
     Sends a text chunk to the selected Provider/Model and retrieves Anki CSV cards.
     formatting_mode: "Plain Text", "Markdown/HTML", or "LaTeX/KaTeX"
+    existing_topics: list of titles/questions already generated to avoid duplicates.
     """
     # Determine Rules based on settings
     length_instruction = ""
@@ -264,7 +284,13 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
     custom_instruction_str = ""
     if custom_prompt:
         custom_instruction_str = f"8. USER OVERRIDE/ADDITION: {custom_prompt}"
-
+    
+    anti_dupe_instruction = ""
+    if existing_topics:
+        # Keep last 50 to avoid prompt bloat
+        topics_str = "; ".join(existing_topics[-50:]) 
+        anti_dupe_instruction = f"9. ANTI-DUPLICATE: The following concepts have ALREADY been generated. Do NOT create cards for them: [{topics_str}]"
+    
     system_instruction = f"""You are a world-class Anki flashcard creator that helps students create flashcards that help them remember facts, concepts, and ideas from videos. You will be given a video or document or snippet.
     
     Identify key high-level concepts and ideas presented, including relevant equations. If the content is math or physics-heavy, focus on concepts. If the content isn't heavy on concepts, focus on facts. Use your own knowledge to flesh out any additional details (e.g., relevant facts, dates, and equations) to ensure the flashcards are self-contained.
@@ -281,6 +307,7 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
     7. {density_instruction}
     8. {highlight_instruction}
     {custom_instruction_str}
+    {anti_dupe_instruction}
     """
 
 
@@ -343,7 +370,8 @@ def analyze_toc_with_gemini(toc_text: str, model_name: str = "gemini-2.5-flash-l
     Rules:
     1. Ignore preface, foreword, or front matter (pages usually roman numerals or low numbers). Start with Chapter 1 if possible.
     2. Extract the main chapters or units.
-    3. The 'page' must be the integer page number found in the text.
+    3. **CRITICAL**: The 'page' must be the **PDF page number** (integer) found in the text. if the text says "Page 123", output 123.
+    4. If page numbers are missing or not parseable, return an empty list.
     
     Text:
     {toc_text[:30000]} 

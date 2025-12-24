@@ -5,8 +5,11 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-from utils.pdf_processor import extract_text_from_pdf, clean_text, recursive_character_text_splitter
-from utils.llm_handler import configure_gemini, configure_openrouter, process_chunk, get_chat_response, sort_files_with_gemini, generate_chapter_summary, generate_full_summary, detect_chapters_in_text, split_text_by_chapters
+from utils.pdf_processor import extract_text_from_pdf, clean_text, recursive_character_text_splitter, get_pdf_front_matter, extract_chapters_from_pdf
+from utils.llm_handler import configure_gemini, configure_openrouter, process_chunk, get_chat_response, sort_files_with_gemini, generate_chapter_summary, generate_full_summary, detect_chapters_in_text, split_text_by_chapters, analyze_toc_with_gemini, extract_json_from_text
+from utils.data_processing import robust_csv_parse, push_card_to_anki
+from utils.rag import SimpleVectorStore
+import json
 
 # Page Config
 st.set_page_config(
@@ -103,6 +106,11 @@ with st.sidebar:
     chunk_size = st.slider("Chunk Size (chars)", 5000, 20000, 10000, step=1000)
     developer_mode = st.toggle("Developer Mode", value=False)
     show_general_chat = st.toggle("Show General AI Chat", value=False, help="Enable the general AI chat panel on the right side")
+    
+    st.divider()
+    if st.button("🔒 Clear Session & Keys", type="secondary"):
+        st.session_state.clear()
+        st.rerun()
 
 # Split View
 st.divider()
@@ -137,21 +145,41 @@ with col_gen:
                 file_chapters = []
                 progress_text = st.empty()
                 
+                # Init Vector Store
+                if 'vector_store' not in st.session_state:
+                    st.session_state.vector_store = SimpleVectorStore()
+                
+                # Clear previous data
+                st.session_state['chapters_data'] = []
+                st.session_state.vector_store.clear()
+                
                 for idx, name in enumerate(sorted_names):
                     if name in file_map:
-                        progress_text.text(f"Extracting text from {name}...")
                         f = file_map[name]
-                        text = extract_text_from_pdf(f)
                         fname = f.name.replace(".pdf", "").replace("_", " ").title()
                         
                         # Chapter Detection Option
                         if detect_chapters:
-                            progress_text.text(f"Detecting chapters in {name}...")
-                            detected_chapters = detect_chapters_in_text(text, fname, model_name=summary_model)
+                            progress_text.text(f"Analyzing TOC in {name}...")
+                            # 1. Get Front Matter
+                            front_matter = get_pdf_front_matter(f)
+                            # 2. Extract TOC
+                            toc_json_text = analyze_toc_with_gemini(front_matter, model_name=summary_model)
+                            try:
+                                toc_list = extract_json_from_text(toc_json_text)
+                            except:
+                                toc_list = []
                             
-                            if detected_chapters:
-                                progress_text.text(f"Splitting {name} into {len(detected_chapters)} chapters...")
-                                chapter_texts = split_text_by_chapters(text, detected_chapters)
+                            if toc_list:
+                                progress_text.text(f"Splitting {name} into {len(toc_list)} chapters...")
+                                try:
+                                    # 3. Split PDF by pages
+                                    # Ensure we rewind file stream inside the function or here
+                                    # extract_chapters_from_pdf does seek(0)
+                                    chapter_texts = extract_chapters_from_pdf(f, toc_list)
+                                except Exception as e:
+                                    st.error(f"Split failed: {e}")
+                                    chapter_texts = []
                                 
                                 if chapter_texts:
                                     # Successfully split into chapters
@@ -159,30 +187,44 @@ with col_gen:
                                         ch_title = ch_data['title']
                                         ch_text = ch_data['text']
                                         
-                                        # Generate summary for each chapter
+                                        # Use robust cleaner
+                                        ch_text_cleaned = clean_text(ch_text)
+                                        
+                                        # Generate summary
                                         try:
-                                            ch_summary = generate_chapter_summary(ch_text, model_name=summary_model)
+                                            ch_summary = generate_chapter_summary(ch_text_cleaned, model_name=summary_model)
                                         except:
                                             ch_summary = "(Summary generation failed)"
                                         
+                                        # Index for RAG
+                                        chunks = recursive_character_text_splitter(ch_text_cleaned, chunk_size=2000)
+                                        st.session_state.vector_store.add_chunks(chunks, metadata_list=[{"source": f"{fname} - {ch_title}"}]*len(chunks))
+                                        
                                         file_chapters.append({
                                             "title": f"{fname} - {ch_title}",
-                                            "text": ch_text,
+                                            "text": ch_text_cleaned,
                                             "summary": ch_summary,
                                             "parent_file": fname
                                         })
                                     continue  # Move to next file
                         
                         # Default: treat entire file as one chapter
-                        progress_text.text(f"Summarizing {name}...")
+                        progress_text.text(f"Processing full text of {name}...")
+                        text = extract_text_from_pdf(f)
+                        cleaned_text = clean_text(text)
+                        
+                        # Index for RAG
+                        chunks = recursive_character_text_splitter(cleaned_text, chunk_size=2000)
+                        st.session_state.vector_store.add_chunks(chunks, metadata_list=[{"source": fname}]*len(chunks))
+
                         try:
-                            summary = generate_chapter_summary(text, model_name=summary_model)
+                            summary = generate_chapter_summary(cleaned_text, model_name=summary_model)
                         except:
                             summary = "(Summary generation failed)"
                         
                         file_chapters.append({
                             "title": fname,
-                            "text": text,
+                            "text": cleaned_text,
                             "summary": summary,
                             "parent_file": fname
                         })
@@ -221,10 +263,19 @@ with col_gen:
 
                         with st.chat_message("assistant"):
                             provider_code = "google" if provider == "Google Gemini" else "openrouter"
-                            with st.spinner("Thinking..."):
+                            with st.spinner("Thinking (RAG)..."):
+                                # RAG Retrieval
+                                context_text = ""
+                                if 'vector_store' in st.session_state:
+                                    relevant_chunks = st.session_state.vector_store.search(pdf_prompt, k=5)
+                                    context_text = "\n\n".join([c['text'] for c in relevant_chunks])
+                                else:
+                                    # Fallback to full context if store missing
+                                    context_text = all_text_context[:100000]
+
                                 response = get_chat_response(
                                     st.session_state.pdf_messages, 
-                                    all_text_context, 
+                                    context_text, 
                                     provider_code, 
                                     model_name,
                                     direct_chat=False
@@ -245,6 +296,9 @@ with col_gen:
                     status_text = st.empty()
                     provider_code = "google" if provider == "Google Gemini" else "openrouter"
                     
+                    if 'generated_questions' not in st.session_state:
+                        st.session_state['generated_questions'] = []
+                    
                     for ch_idx, chapter in enumerate(st.session_state['chapters_data']):
                         raw_text = chapter['text']
                         cleaned = clean_text(raw_text)
@@ -264,12 +318,18 @@ with col_gen:
                                 card_density=card_density,
                                 enable_highlighting=enable_highlighting,
                                 custom_prompt=custom_prompt,
-                                formatting_mode=formatting_mode
+                                formatting_mode=formatting_mode,
+                                existing_topics=st.session_state['generated_questions']
                             )
                             
                             if csv_chunk and not csv_chunk.startswith("Error"):
                                 try:
-                                    df_chunk = pd.read_csv(StringIO(csv_chunk), sep="\t", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
+                                    df_chunk = robust_csv_parse(csv_chunk)
+                                    if not df_chunk.empty:
+                                         # Track generated questions for anti-duplication
+                                         new_questions = df_chunk["Front"].tolist()
+                                         st.session_state['generated_questions'].extend(new_questions)
+                                    
                                     clean_title = chapter['title'].replace(" ", "_").replace(":", "-")
                                     parent_file = chapter.get('parent_file', chapter['title']).replace(" ", "_").replace(":", "-")
                                     
@@ -312,7 +372,27 @@ with col_gen:
 
             if 'result_df' in st.session_state:
                 st.dataframe(st.session_state['result_df'], width='stretch')
-                st.download_button("Download anki_cards.txt", st.session_state['result_csv'], "anki_cards.txt", "text/plain")
+                
+                col_dl, col_push = st.columns(2)
+                with col_dl:
+                     st.download_button("Download anki_cards.txt", st.session_state['result_csv'], "anki_cards.txt", "text/plain")
+                
+                with col_push:
+                     if st.button("🚀 Push to Anki (AnkiConnect)"):
+                         success_count = 0
+                         total = len(st.session_state['result_df'])
+                         my_bar = st.progress(0)
+                         
+                         for i, row in st.session_state['result_df'].iterrows():
+                             tags = [row['Tag']] if row['Tag'] else []
+                             if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags):
+                                 success_count += 1
+                             my_bar.progress(min((i+1)/total, 1.0))
+                         
+                         if success_count > 0:
+                             st.success(f"Pushed {success_count}/{total} cards!")
+                         else:
+                             st.warning("Failed to push. Ensure Anki is open and AnkiConnect is installed.")
             
             st.divider()
             
@@ -335,10 +415,11 @@ with col_gen:
                                 card_density=card_density,
                                 enable_highlighting=enable_highlighting,
                                 custom_prompt=custom_prompt,
-                                formatting_mode=formatting_mode
+                                formatting_mode=formatting_mode,
+                                existing_topics=[] # Don't strictly check vs other chapters for single-gen, or maybe we should? For now leave empty for freedom.
                             )
                             try:
-                                df_single = pd.read_csv(StringIO(csv_text), sep="\t", names=["Front", "Back"], engine="python", quotechar='"', on_bad_lines='skip')
+                                df_single = robust_csv_parse(csv_text)
                                 st.success(f"Generated {len(df_single)} cards!")
                                 st.dataframe(df_single)
                                 # Allow download with Anki header
