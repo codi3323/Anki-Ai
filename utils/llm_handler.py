@@ -300,13 +300,27 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
         
         # Clean up response if it contains markdown code blocks
         text = text_resp.strip()
-        if text.startswith("```"):
-            lines = text.splitlines()
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines[-1].startswith("```"):
-                lines = lines[:-1]
-            text = "\n".join(lines)
+        
+        # Remove markdown code blocks if present
+        if "```" in text:
+            import re
+            # Extract content identifying as csv/tsv or just the first block
+            match = re.search(r"```(?:csv|tsv)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+            if match:
+                text = match.group(1).strip()
+        
+        # Additional cleanup: Remove lines that don't look like CSV/TSV data
+        lines = text.splitlines()
+        clean_lines = []
+        for line in lines:
+            line = line.strip()
+            if not line: continue
+            # Basic heuristic: accept lines with quotes and delimiter
+            if '"' in line and ("\t" in line or "|" in line):
+                 clean_lines.append(line)
+        
+        if clean_lines:
+            text = "\n".join(clean_lines)
             
         return text
     except Exception as e:
@@ -471,10 +485,45 @@ Rules:
             )
             resp_text = response.text
             
-        chapters = json.loads(resp_text)
+        try:
+            chapters = extract_json_from_text(resp_text)
+        except:
+             chapters = []
+        
         return chapters if isinstance(chapters, list) and len(chapters) >= 2 else []
     except:
         return []  # If detection fails, treat as single document
+
+def extract_json_from_text(text: str):
+    """Safely extracts JSON from a string, handling markdown code blocks."""
+    import json
+    import re
+    
+    text = text.strip()
+    
+    # 1. Try to find markdown JSON block
+    match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        text = match.group(1).strip()
+        
+    # 2. If valid JSON, return it
+    try:
+        return json.loads(text)
+    except:
+        pass
+        
+    # 3. Try to find start [ and end ]
+    start = text.find('[')
+    end = text.rfind(']')
+    
+    if start != -1 and end != -1 and end > start:
+        json_str = text[start:end+1]
+        try:
+            return json.loads(json_str)
+        except:
+            pass
+            
+    return []
 
 
 def split_text_by_chapters(text: str, chapters: list) -> list:

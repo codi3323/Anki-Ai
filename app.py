@@ -290,7 +290,10 @@ with col_gen:
                                              df_chunk["Deck"] = f"Medical::{clean_title}"
                                          df_chunk["Tag"] = clean_title
                                     all_dfs.append(df_chunk)
-                                except: pass
+                                except Exception as e:
+                                    if developer_mode:
+                                        st.warning(f"Failed to parse chunk: {e}")
+                                        st.code(csv_chunk)
                     
                     progress_bar.progress(1.0)
                     if all_dfs:
