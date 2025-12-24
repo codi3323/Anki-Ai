@@ -102,10 +102,15 @@ with st.sidebar:
     st.divider()
     chunk_size = st.slider("Chunk Size (chars)", 5000, 20000, 10000, step=1000)
     developer_mode = st.toggle("Developer Mode", value=False)
+    show_general_chat = st.toggle("Show General AI Chat", value=False, help="Enable the general AI chat panel on the right side")
 
 # Split View
 st.divider()
-col_gen, col_chat = st.columns([5, 4])
+if show_general_chat:
+    col_gen, col_chat = st.columns([5, 4])
+else:
+    col_gen = st.container()
+    col_chat = None
 
 # ==================== ANKI GENERATOR COLUMN ====================
 with col_gen:
@@ -348,39 +353,40 @@ with col_gen:
                         st.session_state['chapters_data'][idx]['title'] = new_title
 
 # ==================== GENERAL AI CHAT COLUMN ====================
-with col_chat:
-    st.subheader("🤖 General AI Chat")
-    st.caption(f"Model: {model_name}")
-    
-    if "general_messages" not in st.session_state:
-        st.session_state.general_messages = []
-
-    gen_chat_container = st.container(height=600)
-    with gen_chat_container:
-        for message in st.session_state.general_messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-    if gen_prompt := st.chat_input("Chat with the AI...", key="general_chat_input"):
-        st.session_state.general_messages.append({"role": "user", "content": gen_prompt})
-        with gen_chat_container:
-            with st.chat_message("user"):
-                st.markdown(gen_prompt)
-
-            with st.chat_message("assistant"):
-                provider_code = "google" if provider == "Google Gemini" else "openrouter"
-                with st.spinner("Thinking..."):
-                    response = get_chat_response(
-                        st.session_state.general_messages, 
-                        "",  # No context for general chat
-                        provider_code, 
-                        model_name,
-                        direct_chat=True
-                    )
-                st.markdown(response)
+if show_general_chat and col_chat is not None:
+    with col_chat:
+        st.subheader("🤖 General AI Chat")
+        st.caption(f"Model: {model_name}")
         
-        st.session_state.general_messages.append({"role": "assistant", "content": response})
-        st.rerun()
+        if "general_messages" not in st.session_state:
+            st.session_state.general_messages = []
+
+        gen_chat_container = st.container(height=600)
+        with gen_chat_container:
+            for message in st.session_state.general_messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+
+        if gen_prompt := st.chat_input("Chat with the AI...", key="general_chat_input"):
+            st.session_state.general_messages.append({"role": "user", "content": gen_prompt})
+            with gen_chat_container:
+                with st.chat_message("user"):
+                    st.markdown(gen_prompt)
+
+                with st.chat_message("assistant"):
+                    provider_code = "google" if provider == "Google Gemini" else "openrouter"
+                    with st.spinner("Thinking..."):
+                        response = get_chat_response(
+                            st.session_state.general_messages, 
+                            "",  # No context for general chat
+                            provider_code, 
+                            model_name,
+                            direct_chat=True
+                        )
+                    st.markdown(response)
+            
+            st.session_state.general_messages.append({"role": "assistant", "content": response})
+            st.rerun()
 
 if not api_key:
     st.toast("⚠️ API Key not configured")

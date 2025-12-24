@@ -274,13 +274,12 @@ def process_chunk(text_chunk: str, provider: str = "google", model_name: str = "
     2. TSV Structure: "Front"[TAB]"Back". Use a TAB character as the delimiter (not pipe, not comma). Enclose EVERY field in double quotes. If a field contains a double quote, escape it by doubling it (" -> "").
     3. Completeness: EVERY card MUST have a Question (Front) AND an Answer (Back). Do not generate headers.
     4. Strictness: Output ONLY the TSV content. No code fences. One card per line.
-    
-    
+    5. NO DUPLICATES: Do NOT generate duplicate or near-duplicate questions. Each card must test a UNIQUE concept. If you've already created a card about a topic, do NOT rephrase the same question.
     
     Custom Preferences:
-    5. {length_instruction}
-    6. {density_instruction}
-    7. {highlight_instruction}
+    6. {length_instruction}
+    7. {density_instruction}
+    8. {highlight_instruction}
     {custom_instruction_str}
     """
 
