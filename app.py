@@ -12,7 +12,7 @@ from utils.rag import SimpleVectorStore
 import json
 
 # Versioning
-VERSION = "v2.4.0"
+VERSION = "v2.4.1"
 
 # Page Config
 st.set_page_config(
@@ -446,22 +446,54 @@ with col_gen:
                                 enable_highlighting=enable_highlighting,
                                 custom_prompt=custom_prompt,
                                 formatting_mode=formatting_mode,
-                                existing_topics=[] # Don't strictly check vs other chapters for single-gen, or maybe we should? For now leave empty for freedom.
+                                existing_topics=[] 
                             )
                             try:
                                 df_single = robust_csv_parse(csv_text)
-                                st.success(f"Generated {len(df_single)} cards!")
-                                st.dataframe(df_single)
-                                # Allow download with Anki header
                                 clean_title = ch['title'].replace(" ", "_").replace(":", "-")
                                 df_single["Deck"] = f"{base_deck_name}::{clean_title}"
                                 df_single["Tag"] = clean_title
                                 anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
                                 single_tsv = anki_header + df_single.to_csv(sep="\t", index=False, header=False, quoting=1)
-                                st.download_button(f"Download {ch['title']}.txt", single_tsv, f"{clean_title}.txt", "text/plain", key=f"dl_{idx}")
+                                
+                                # Store in session state to persist
+                                st.session_state[f"result_df_{idx}"] = df_single
+                                st.session_state[f"result_csv_{idx}"] = single_tsv
+                                
                             except Exception as e:
                                 st.error(f"Parsing Error: {e}")
                                 if developer_mode: st.code(csv_text)
+                    
+                    # Persistent Results UI
+                    res_df_key = f"result_df_{idx}"
+                    res_csv_key = f"result_csv_{idx}"
+                    
+                    if res_df_key in st.session_state:
+                        df_s = st.session_state[res_df_key]
+                        csv_s = st.session_state[res_csv_key]
+                        
+                        st.dataframe(df_s)
+                        
+                        col_single_dl, col_single_push = st.columns(2)
+                        with col_single_dl:
+                            st.download_button(f"Download {ch['title']}.txt", csv_s, f"{ch['title']}.txt", "text/plain", key=f"dl_btn_{idx}")
+                        
+                        with col_single_push:
+                            if st.button(f"🚀 Push {ch['title']} to Anki", key=f"push_btn_{idx}"):
+                                success_count = 0
+                                total = len(df_s)
+                                my_bar = st.progress(0)
+                                
+                                for i, row in df_s.iterrows():
+                                    tags = [row['Tag']] if row['Tag'] else []
+                                    if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags):
+                                        success_count += 1
+                                    my_bar.progress(min((i+1)/total, 1.0))
+                                
+                                if success_count > 0:
+                                    st.success(f"Pushed {success_count}/{total} cards!")
+                                else:
+                                    st.warning("Failed to push. Ensure Anki is open and AnkiConnect is installed.")
                     
                     if new_title != ch['title']:
                         st.session_state['chapters_data'][idx]['title'] = new_title
