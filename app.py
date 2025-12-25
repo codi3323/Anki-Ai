@@ -12,7 +12,7 @@ from utils.rag import SimpleVectorStore
 import json
 
 # Versioning
-VERSION = "v2.3.0"
+VERSION = "v2.4.0"
 
 # Page Config
 st.set_page_config(
@@ -159,9 +159,18 @@ with col_gen:
         card_density = st.select_slider("Card Count / Density", options=["Low (Key Concepts)", "Normal", "High (Comprehensive)"], value="Normal")
         enable_highlighting = st.toggle("Highlight Key Terms (Bold)", value=True)
         custom_prompt = st.text_area("Custom Instructions", help="E.g., 'Focus on Pharmacology'")
-        deck_type = st.radio("Deck Organization", ["Subdecks (Medical::Item)", "Tags Only (Deck: Medical, Tag: Item)", "Both"], help="Organization structure.")
+        deck_type = st.radio("Deck Organization", ["Subdecks (Base::Item)", "Tags Only (Deck: Base, Tag: Item)", "Both"], help="Organization structure.")
         formatting_mode = st.radio("Card Formatting", ["Basic + MathJax", "Markdown", "Legacy LaTeX"], index=0, help="Basic + MathJax = works with default Anki. Markdown = styled text. Legacy LaTeX = [latex]...[/latex] tags.")
         detect_chapters = st.toggle("Auto-Detect Chapters within PDFs", value=False, help="Uses AI to split each PDF into individual chapters for better deck organization.")
+        
+        # New Deck Name Field
+        uploaded_files_preview = st.session_state.get("anki_uploader", [])
+        default_deck = "Anki-AI"
+        if uploaded_files_preview:
+            first_fname = uploaded_files_preview[0].name.replace(".pdf", "").replace("_", " ").title()
+            default_deck = f"Anki-AI: {first_fname}"
+        
+        base_deck_name = st.text_input("Base Deck Name", value=default_deck, help="The top-level deck name in Anki.")
 
     uploaded_files = st.file_uploader("Upload Medical PDF(s)", type=["pdf"], accept_multiple_files=True, key="anki_uploader")
 
@@ -355,20 +364,20 @@ with col_gen:
                                     parent_file = chapter.get('parent_file', chapter['title']).replace(" ", "_").replace(":", "-")
                                     
                                     if "Subdecks" in deck_type:
-                                        # If chapters detected, create: Medical::ParentFile::Chapter
+                                        # If chapters detected, create: Base::ParentFile::Chapter
                                         if 'parent_file' in chapter and chapter['parent_file'] != chapter['title']:
-                                            df_chunk["Deck"] = f"Medical::{parent_file}::{clean_title}"
+                                            df_chunk["Deck"] = f"{base_deck_name}::{parent_file}::{clean_title}"
                                         else:
-                                            df_chunk["Deck"] = f"Medical::{clean_title}"
+                                            df_chunk["Deck"] = f"{base_deck_name}::{clean_title}"
                                         df_chunk["Tag"] = ""
                                     elif "Tags" in deck_type:
-                                         df_chunk["Deck"] = "Medical"
+                                         df_chunk["Deck"] = base_deck_name
                                          df_chunk["Tag"] = clean_title
                                     else:
                                          if 'parent_file' in chapter and chapter['parent_file'] != chapter['title']:
-                                             df_chunk["Deck"] = f"Medical::{parent_file}::{clean_title}"
+                                             df_chunk["Deck"] = f"{base_deck_name}::{parent_file}::{clean_title}"
                                          else:
-                                             df_chunk["Deck"] = f"Medical::{clean_title}"
+                                             df_chunk["Deck"] = f"{base_deck_name}::{clean_title}"
                                          df_chunk["Tag"] = clean_title
                                     all_dfs.append(df_chunk)
                                 except Exception as e:
@@ -445,7 +454,7 @@ with col_gen:
                                 st.dataframe(df_single)
                                 # Allow download with Anki header
                                 clean_title = ch['title'].replace(" ", "_").replace(":", "-")
-                                df_single["Deck"] = f"Medical::{clean_title}"
+                                df_single["Deck"] = f"{base_deck_name}::{clean_title}"
                                 df_single["Tag"] = clean_title
                                 anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
                                 single_tsv = anki_header + df_single.to_csv(sep="\t", index=False, header=False, quoting=1)
