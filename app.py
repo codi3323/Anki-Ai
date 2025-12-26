@@ -12,7 +12,7 @@ from utils.rag import SimpleVectorStore
 import json
 
 # Versioning
-VERSION = "v2.5.0"
+VERSION = "v2.5.1"
 
 # Page Config
 st.set_page_config(
