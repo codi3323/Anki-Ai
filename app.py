@@ -300,8 +300,8 @@ with col_gen:
                         with st.chat_message("assistant"):
                             provider_code = "google" if provider == "Google Gemini" else "openrouter"
                             with st.spinner("Thinking (RAG)..."):
-                                # RAG Retrieval
-                                    context_text = ""
+                                # RAG Retrieval (Verified)
+                                context_text = ""
                                 if 'vector_store' in st.session_state:
                                     relevant_chunks = st.session_state.vector_store.search(pdf_prompt, google_client=st.session_state.google_client, k=5)
                                     context_text = "\n\n".join([c['text'] for c in relevant_chunks])
