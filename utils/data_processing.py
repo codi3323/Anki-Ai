@@ -202,3 +202,51 @@ def robust_csv_parse(csv_text: str) -> pd.DataFrame:
         data.append({"Front": front, "Back": back})
         
     return pd.DataFrame(data)
+
+def push_notes_to_anki(notes: list, anki_url: str = None) -> tuple[int, list]:
+    """
+    Pushes a batch of notes to Anki via AnkiConnect's addNotes.
+    Returns (success_count, errors).
+    """
+    if not anki_url:
+        anki_url = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
+        
+    payload = {
+        "action": "addNotes",
+        "version": 6,
+        "params": {
+            "notes": notes
+        }
+    }
+    
+    try:
+        response = requests.post(anki_url, json=payload, timeout=ANKICONNECT_TIMEOUT * 2)
+        result = response.json()
+        
+        if result.get("error"):
+            # Global error
+            logger.error(f"AnkiConnect global error: {result.get('error')}")
+            return 0, [str(result.get('error'))]
+            
+        # Result is a list of node IDs (int) or None (if error)
+        # However, addNotes might return differently depending on version, 
+        # usually it returns an array of note IDs for success, or nulls.
+        # But if strict error handling is on, checking distinct errors might be tricky.
+        # Let's assume result['result'] is the list.
+        
+        results = result.get('result', [])
+        success_count = 0
+        errors = []
+        
+        if results:
+            for i, res in enumerate(results):
+                if res:
+                    success_count += 1
+                else:
+                    errors.append(f"Failed to add note {i+1}")
+                    
+        return success_count, errors
+        
+    except Exception as e:
+        logger.error(f"Batch push failed: {e}")
+        return 0, [str(e)]
