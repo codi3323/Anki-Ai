@@ -10,3 +10,4 @@ pytest
 requests
 streamlit>=1.41.0
 tenacity>=8.2.0
+extra-streamlit-components>=0.1.71

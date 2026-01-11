@@ -8,11 +8,22 @@ from components.session import load_fallback_keys
 from utils.auth import UserManager
 
 
-def render_sidebar():
+
+def render_sidebar(cookie_manager=None):
     """Renders the sidebar and returns configuration."""
     auth_manager = UserManager()
     email = st.session_state.get('user_email')
     user_keys = st.session_state.get('user_keys', {})
+
+    with st.sidebar:
+        # ... (rest of the sidebar code) ...
+        # (skipping unchanged parts is hard with replace_file_content for signature change + deep logic change)
+        # Wait, I need to match the indentation and structure.
+        # Since I can't use "..." I have to select a chunk.
+        
+        # Let's target the definition and the logout block separately or together if close.
+        # They are far apart (Start of file vs End of file).
+        # Multi-replace is better.
 
     with st.sidebar:
         # User info
@@ -192,6 +203,12 @@ def render_sidebar():
         col_logout, col_clear = st.columns(2)
         with col_logout:
             if st.button("🚪 Logout", use_container_width=True):
+                if cookie_manager:
+                    try:
+                        cookie_manager.delete("session_token")
+                    except Exception as e:
+                        # Sometimes deleting fails if cookie doesn't exist etc.
+                        pass
                 st.session_state.clear()
                 st.rerun()
         

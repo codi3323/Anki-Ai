@@ -2,7 +2,10 @@ import streamlit as st
 from utils.auth import UserManager
 import time
 
-def render_login():
+
+from datetime import datetime, timedelta
+
+def render_login(cookie_manager=None):
     """Renders the login, registration, and password reset tabs."""
     st.header("🔐 Welcome to Anki AI")
     
@@ -34,6 +37,14 @@ def render_login():
                         st.session_state['user_keys'] = result['api_keys']
                         # Reset is_guest if accidentally set
                         st.session_state['is_guest'] = False
+                        
+                        # Set secure session cookie
+                        if cookie_manager:
+                            token = auth_manager.create_session(result['email'])
+                            if token:
+                                expires = datetime.now() + timedelta(days=30)
+                                cookie_manager.set("session_token", token, expires_at=expires)
+                        
                         time.sleep(0.5)
                         st.rerun()
                     else:

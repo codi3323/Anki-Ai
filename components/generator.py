@@ -346,7 +346,7 @@ def render_generator(config):
                          anki_url = st.session_state.get('anki_connect_url', 'http://localhost:8765')
                          
                          # Check connection first
-                         is_reachable, msg = check_ankiconnect(anki_url)
+                         is_reachable, msg, working_url = check_ankiconnect(anki_url)
                          if not is_reachable:
                              st.error(f"❌ {msg}")
                          else:
@@ -357,7 +357,7 @@ def render_generator(config):
                              
                              for i, row in st.session_state['result_df'].iterrows():
                                  tags = [row['Tag']] if row['Tag'] else []
-                                 if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags, anki_url):
+                                 if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags, working_url):
                                      success_count += 1
                                  my_bar.progress(min((i+1)/total, 1.0))
                              
@@ -500,7 +500,7 @@ def render_generator(config):
                         with col_single_push:
                             if st.button(f"🚀 Push (Server)", key=f"push_btn_{idx}"):
                                 anki_url = st.session_state.get('anki_connect_url', 'http://localhost:8765')
-                                is_reachable, msg = check_ankiconnect(anki_url)
+                                is_reachable, msg, working_url = check_ankiconnect(anki_url)
                                 if not is_reachable:
                                     st.error(f"❌ {msg}")
                                 else:
@@ -510,7 +510,7 @@ def render_generator(config):
                                     
                                     for i, row in df_s.iterrows():
                                         tags = [row['Tag']] if row['Tag'] else []
-                                        if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags, anki_url):
+                                        if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags, working_url):
                                             success_count += 1
                                         my_bar.progress(min((i+1)/total, 1.0))
                                     

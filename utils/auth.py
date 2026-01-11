@@ -451,4 +451,53 @@ class UserManager:
             data[email]["api_keys"] = encrypted_keys
             self._save_data(data)
         
-        return decrypted_keys
+
+    def create_session(self, email):
+        """
+        Creates a session token for the user.
+        """
+        data = self._load_data()
+        if email not in data:
+            return None
+        
+        # simple random token
+        token = secrets.token_urlsafe(32)
+        # expire in 30 days
+        expiry = time.time() + (30 * 24 * 60 * 60)
+        
+        # Store session
+        if "sessions" not in data[email]:
+            data[email]["sessions"] = {}
+            
+        data[email]["sessions"][token] = expiry
+        
+        # Cleanup old sessions
+        current_time = time.time()
+        active_sessions = {t: e for t, e in data[email]["sessions"].items() if e > current_time}
+        data[email]["sessions"] = active_sessions
+        
+        self._save_data(data)
+        return token
+
+    def validate_session(self, email, token):
+        """
+        Validates a session token.
+        """
+        data = self._load_data()
+        if email not in data:
+            return False
+            
+        sessions = data[email].get("sessions", {})
+        expiry = sessions.get(token)
+        
+        if not expiry:
+            return False
+            
+        if time.time() > expiry:
+            # Expired, remove it
+            del data[email]["sessions"][token]
+            self._save_data(data)
+            return False
+            
+        return True
+

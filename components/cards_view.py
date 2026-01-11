@@ -146,7 +146,7 @@ def push_deck_tree(node):
     count = len(df)
     deck_name = node['full_name']
     
-    status_ok, msg = check_ankiconnect()
+    status_ok, msg, anki_url = check_ankiconnect()
     if not status_ok:
         st.error(f"Cannot connect to Anki: {msg}")
         return
@@ -155,7 +155,7 @@ def push_deck_tree(node):
         # The 'Deck' column in the DF already contains the correct full path (e.g. A::B)
         # So we just need to push the notes.
         notes = format_cards_for_ankiconnect(df)
-        success, errors = push_notes_to_anki(notes)
+        success, errors = push_notes_to_anki(notes, anki_url=anki_url)
         
         if success > 0:
             st.toast(f"✅ Pushed {success} cards to Anki!")

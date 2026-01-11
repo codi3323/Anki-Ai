@@ -121,9 +121,59 @@ if st.session_state.get('is_logged_in', False):
 if current_view != 'chat':
     st.title("🩺 Medical PDF to Anki Converter (AI-Powered)")
 
+
+# --- Initialize Cookie Manager for Session Persistence ---
+import extra_streamlit_components as stx
+from utils.auth import UserManager
+
+# Initialize Cookie Manager
+cookie_manager = stx.CookieManager()
+
+# Check for existing session cookie if not logged in
+if not st.session_state.get('is_logged_in', False):
+    # Wait a bit for cookies to load (stx limitation sometimes)
+    cookies = cookie_manager.get_all()
+    session_token = cookies.get("session_token")
+    
+    if session_token:
+        auth_manager = UserManager()
+        # We need to find which user owns this token. 
+        # Ideally UserManager should have a method to find user by token.
+        # But our current implementation stores sessions inside user dict.
+        # We'll need a helper or scan. Scanning is okay for small user base.
+        # Let's add a helper to UserManager or just scan here.
+        # To be cleaner, let's update UserManager to support 'get_user_by_token'.
+        # For now, let's do a quick scan since we didn't add that method yet.
+        
+        # Actually, let's implement get_user_by_token in auth.py first to be clean.
+        # But to avoid context switching too much, we can do:
+        
+        all_users = auth_manager._load_data()
+        found_email = None
+        for email, data in all_users.items():
+            if "sessions" in data and session_token in data["sessions"]:
+                # specific token validation
+                if auth_manager.validate_session(email, session_token):
+                    found_email = email
+                    break
+        
+        if found_email:
+             # Auto-login
+            user_data = all_users[found_email]
+            st.session_state['is_logged_in'] = True
+            st.session_state['user_email'] = found_email
+            st.session_state['user_keys'] = auth_manager.get_keys(found_email) # Decrypt keys
+            st.session_state['is_guest'] = False
+            
+            # Init empty defaults if needed
+            if 'chapters_data' not in st.session_state: st.session_state['chapters_data'] = []
+            
+            # Optional: Refresh token expiry?
+            # For now, just proceed inside.
+
 # --- Auth Flow ---
 if not st.session_state.get('is_logged_in', False):
-    render_login()
+    render_login(cookie_manager) # Pass cookie manager to login
 
     st.stop() # Stop execution here until logged in
 
@@ -157,7 +207,7 @@ if not st.session_state.get('keys_configured', False):
 # Render Sidebar & Get Config (Skip in Chat Mode to avoid double controls)
 config = {}
 if current_view != 'chat':
-    config = render_sidebar()
+    config = render_sidebar(cookie_manager=cookie_manager)
 
 # Render Settings Modal if open
 if st.session_state.get('show_settings_modal', False):

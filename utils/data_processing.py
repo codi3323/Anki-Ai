@@ -12,36 +12,49 @@ logger = logging.getLogger(__name__)
 # Constants
 ANKICONNECT_TIMEOUT = 5  # seconds
 
-def check_ankiconnect(anki_url: str = None) -> tuple[bool, str]:
+def check_ankiconnect(anki_url: str = None) -> tuple[bool, str, str]:
     """
     Check if AnkiConnect is reachable.
-    Returns (is_reachable, error_message).
+    Returns (is_reachable, message, working_url).
     """
-    if not anki_url:
-        anki_url = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
+    # Potential URLs to try
+    urls_to_try = []
     
-    # Basic URL structure validation
-    if not (anki_url.startswith("http://") or anki_url.startswith("https://")):
-        return False, "Invalid URL: Must start with http:// or https://"
-    
-    try:
-        response = requests.post(
-            anki_url, 
-            json={"action": "version", "version": 6},
-            timeout=2
-        )
-        result = response.json()
-        if result.get("result"):
-            return True, f"AnkiConnect v{result['result']} at {anki_url}"
-        return False, f"AnkiConnect error: {result.get('error')}"
-    except requests.exceptions.ConnectionError:
-        if "localhost" in anki_url:
-            return False, "Cannot reach localhost:8765. Use ngrok tunnel for Cloud access."
-        return False, f"Cannot connect to {anki_url}"
-    except requests.exceptions.Timeout:
-        return False, "AnkiConnect request timed out"
-    except Exception as e:
-        return False, f"AnkiConnect check failed: {e}"
+    if anki_url:
+        urls_to_try.append(anki_url)
+    else:
+        # Default prioritization
+        urls_to_try.append(os.getenv("ANKI_CONNECT_URL", "http://localhost:8765"))
+        urls_to_try.append("http://host.docker.internal:8765") # For Docker on Windows/Mac
+        urls_to_try.append("http://172.17.0.1:8765") # Common Docker bridge IP on Linux
+
+    last_error = ""
+
+    for url in urls_to_try:
+        # Basic URL structure validation
+        if not (url.startswith("http://") or url.startswith("https://")):
+            continue
+        
+        try:
+            response = requests.post(
+                url, 
+                json={"action": "version", "version": 6},
+                timeout=2
+            )
+            result = response.json()
+            if result.get("result"):
+                return True, f"Connected to AnkiConnect v{result['result']} at {url}", url
+            else:
+                last_error = f"AnkiConnect error at {url}: {result.get('error')}"
+        except requests.exceptions.ConnectionError:
+            pass # Try next URL
+        except requests.exceptions.Timeout:
+            pass
+        except Exception as e:
+            last_error = str(e)
+
+    # If we get here, none worked
+    return False, f"Could not connect to Anki. Ensure Anki is open with AnkiConnect installed. {last_error if last_error else ''}", ""
 
 def deduplicate_cards(new_cards: pd.DataFrame, existing_questions: list[str]) -> pd.DataFrame:
     """
