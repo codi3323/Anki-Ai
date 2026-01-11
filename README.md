@@ -17,6 +17,7 @@ A powerful AI-powered tool that converts medical PDFs into high-yield Anki flash
 - [Authentication & Security](#-authentication--security)
 - [Docker Deployment](#-docker-deployment)
 - [Cloudflare Tunnel Setup](#-cloudflare-tunnel-setup)
+- [Updating the App](#-updating-the-app)
 - [Usage Guide](#-usage-guide)
 - [Settings Reference](#-settings-reference)
 - [Troubleshooting](#-troubleshooting)
@@ -268,6 +269,40 @@ TUNNEL_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 > See [CLOUDFLARE_TUNNEL_SETUP.md](CLOUDFLARE_TUNNEL_SETUP.md) for detailed instructions.
+
+---
+
+## 🔄 Updating the App
+
+To update to the latest version with new features and fixes:
+
+### Docker Setup (Most Common)
+
+```bash
+# 1. Pull latest code
+git pull origin main
+
+# 2. Rebuild and restart containers
+docker-compose up -d --build
+
+# 3. Clean up unused images (optional)
+docker image prune -f
+```
+
+### Manual Setup
+
+```bash
+# 1. Pull latest code
+git pull origin main
+
+# 2. Update dependencies
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Restart the app
+# (Press Ctrl+C to stop, then run:)
+streamlit run app.py
+```
 
 ---
 
