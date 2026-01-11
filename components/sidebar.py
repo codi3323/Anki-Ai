@@ -3,7 +3,7 @@ Sidebar configuration component.
 """
 import streamlit as st
 import os
-from utils.llm_handler import configure_gemini, configure_openrouter
+from utils.llm_handler import configure_gemini, configure_openrouter, configure_zai
 from components.session import load_fallback_keys
 
 def render_sidebar():
@@ -12,7 +12,7 @@ def render_sidebar():
         st.header("Configuration")
         
         # Provider Selection
-        provider = st.radio("AI Provider", ["Google Gemini", "OpenRouter"], index=0)
+        provider = st.radio("AI Provider", ["Google Gemini", "OpenRouter", "Z.AI"], index=0)
         
         api_key = None
         model_name = None
@@ -48,7 +48,7 @@ def render_sidebar():
             }
             summary_model = "gemma-3-27b-it" 
         
-        else: # OpenRouter
+        elif provider == "OpenRouter": # OpenRouter
             st.markdown("[Get OpenRouter Key](https://openrouter.ai/keys)")
             user_api_key = st.text_input("OpenRouter API Key", type="password")
             
@@ -76,6 +76,32 @@ def render_sidebar():
                 "google/gemma-3-27b-it:free": "Gemma 3 27B IT (Free)"
             }
             summary_model = "google/gemini-2.0-flash-exp:free"
+
+        elif provider == "Z.AI":
+            st.markdown("[Get Z.AI API Key](https://z.ai/)") # Using placeholder link if actual one not known, or just text
+            user_api_key = st.text_input("Z.AI API Key", type="password")
+            
+            if user_api_key:
+                api_key = user_api_key
+                st.session_state.zai_client = configure_zai(api_key)
+                st.success("Z.AI Key Configured!")
+            else:
+                 # Check env
+                env_key = os.getenv("ZAI_API_KEY")
+                if env_key:
+                    api_key = env_key
+                    st.session_state.zai_client = configure_zai(api_key)
+                    st.info("Using Z.AI Key from Environment")
+                else:
+                    st.error("Z.AI Key missing.")
+                    api_key = None
+                    st.session_state.zai_client = configure_zai(None)
+            
+            model_options = {
+                "GLM-4.7": "GLM-4.7 (Standard)",
+                "GLM-4.5-air": "GLM-4.5 Air (Lightweight)"
+            }
+            summary_model = "GLM-4.7"
         
         selected_model_key = st.selectbox(
             "Model", 

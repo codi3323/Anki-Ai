@@ -9,6 +9,7 @@ def init_session_state():
     defaults = {
         "google_client": None,
         "openrouter_client": None,
+        "zai_client": None,
         # NOTE: Do NOT set "anki_uploader" here - it's managed by st.file_uploader widget
         "chapters_data": [],
         "generated_questions": [],

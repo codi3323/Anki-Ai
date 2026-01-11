@@ -52,6 +52,7 @@ def _process_files(uploaded_files, detect_chapters, chunk_size, summary_model, s
                     text, fname, 
                     google_client=st.session_state.google_client, 
                     openrouter_client=st.session_state.openrouter_client, 
+                    zai_client=st.session_state.zai_client,
                     model_name=st.session_state.get('config_model_name', 'gemini-2.0-flash-exp') # Fallback or pass model_name
                 )
                 
@@ -71,14 +72,14 @@ def _process_files(uploaded_files, detect_chapters, chunk_size, summary_model, s
                             ch_summary = "Summary skipped (Fast Track)"
                             if not skip_summary:
                                 try:
-                                    ch_summary = generate_chapter_summary(ch_text_cleaned, google_client=st.session_state.google_client, openrouter_client=st.session_state.openrouter_client, model_name=summary_model)
+                                    ch_summary = generate_chapter_summary(ch_text_cleaned, google_client=st.session_state.google_client, openrouter_client=st.session_state.openrouter_client, zai_client=st.session_state.zai_client, model_name=summary_model)
                                 except Exception as e:
                                     logger.warning(f"Summary generation failed for {ch_title}: {e}")
                                     ch_summary = "(Summary generation failed)"
                             
                             # Index for RAG
                             chunks = recursive_character_text_splitter(ch_text_cleaned, chunk_size=2000)
-                            st.session_state.vector_store.add_chunks(chunks, google_client=st.session_state.google_client, metadata_list=[{"source": f"{fname} - {ch_title}"}]*len(chunks))
+                            st.session_state.vector_store.add_chunks(chunks, google_client=st.session_state.google_client, zai_client=st.session_state.zai_client, metadata_list=[{"source": f"{fname} - {ch_title}"}]*len(chunks))
                             
                             file_chapters.append({
                                 "title": f"{fname} - {ch_title}",
@@ -96,12 +97,12 @@ def _process_files(uploaded_files, detect_chapters, chunk_size, summary_model, s
             
             # Index for RAG
             chunks = recursive_character_text_splitter(cleaned_text, chunk_size=2000)
-            st.session_state.vector_store.add_chunks(chunks, google_client=st.session_state.google_client, metadata_list=[{"source": fname}]*len(chunks))
+            st.session_state.vector_store.add_chunks(chunks, google_client=st.session_state.google_client, zai_client=st.session_state.zai_client, metadata_list=[{"source": fname}]*len(chunks))
 
             summary = "Summary skipped (Fast Track)"
             if not skip_summary:
                 try:
-                    summary = generate_chapter_summary(cleaned_text, google_client=st.session_state.google_client, openrouter_client=st.session_state.openrouter_client, model_name=summary_model)
+                    summary = generate_chapter_summary(cleaned_text, google_client=st.session_state.google_client, openrouter_client=st.session_state.openrouter_client, zai_client=st.session_state.zai_client, model_name=summary_model)
                 except Exception as e:
                     logger.warning(f"Summary failed for {name}: {e}")
                     summary = "(Summary generation failed)"
@@ -126,7 +127,12 @@ def _generate_cards(provider, model_name, chunk_size, card_length, card_density,
         all_dfs = []
         progress_bar = st.progress(0)
         status_text = st.empty()
-        provider_code = "google" if provider == "Google Gemini" else "openrouter"
+        
+        provider_code = "google"
+        if provider == "OpenRouter":
+            provider_code = "openrouter"
+        elif provider == "Z.AI":
+             provider_code = "zai"
         
         if 'generated_questions' not in st.session_state:
             st.session_state['generated_questions'] = []
@@ -146,6 +152,7 @@ def _generate_cards(provider, model_name, chunk_size, card_length, card_density,
                     chunk, 
                     google_client=st.session_state.google_client,
                     openrouter_client=st.session_state.openrouter_client,
+                    zai_client=st.session_state.zai_client,
                     provider=provider_code,
                     model_name=model_name,
                     card_length=card_length,
@@ -419,11 +426,18 @@ def render_generator(config):
                     # Single Chapter Generation
                     if st.button(f"⚡ Generate Cards for this Chapter", key=f"gen_single_{idx}"):
                          with st.spinner(f"Generating for {ch['title']}..."):
-                            provider_code = "google" if provider == "Google Gemini" else "openrouter"
+                            if provider == "Google Gemini":
+                                provider_code = "google"
+                            elif provider == "Z.AI":
+                                provider_code = "zai"
+                            else:
+                                provider_code = "openrouter"
+
                             csv_text = process_chunk(
                                 ch['text'], 
                                 google_client=st.session_state.google_client,
                                 openrouter_client=st.session_state.openrouter_client,
+                                zai_client=st.session_state.zai_client,
                                 provider=provider_code,
                                 model_name=model_name,
                                 card_length=card_length,

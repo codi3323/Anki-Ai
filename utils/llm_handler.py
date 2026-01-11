@@ -45,6 +45,18 @@ def configure_openrouter(api_key: str):
         )
     return None
 
+def configure_zai(api_key: str):
+    """
+    Configures the Z.AI API.
+    Returns: OpenAI client instance configured for Z.AI or None.
+    """
+    if api_key and api_key.strip():
+        return openai.OpenAI(
+            base_url="https://api.z.ai/api/coding/paas/v4",
+            api_key=api_key,
+        )
+    return None
+
 # Constants for rate limiting
 RATE_LIMIT_GEMMA = 2.0  # 30 RPM
 RATE_LIMIT_FLASH_LITE = 6.0  # 10 RPM
@@ -59,6 +71,9 @@ OPENROUTER_FALLBACK_MODELS = [
     "mistralai/devstral-2512:free",
     "qwen/qwen3-coder:free",
     "google/gemma-3-27b-it:free"
+]
+ZAI_FALLBACK_MODELS = [
+    "GLM-4.5-air"
 ]
 
 # Context limits
@@ -191,7 +206,42 @@ def _generate_with_openrouter(model_name: str, system_instruction: str, user_con
 
     raise Exception(f"All OpenRouter models failed. Errors: {'; '.join(errors[-3:])}")
 
-def get_chat_response(messages: list, context: str, provider: str, model_name: str, google_client=None, openrouter_client=None, direct_chat: bool = False) -> str:
+def _generate_with_zai(model_name: str, system_instruction: str, user_content: str, client):
+    """Generates content using Z.AI with fallback."""
+    if not client:
+        raise ValueError("Z.AI API Key not configured.")
+
+    # Try the requested model first, then fallbacks
+    models_to_try = [model_name]
+    for m in ZAI_FALLBACK_MODELS:
+        if m not in models_to_try:
+            models_to_try.append(m)
+
+    errors = []
+    for current_model in models_to_try:
+        try:
+            rate_limit_delay(current_model) # Use default rate limit
+            if errors:
+                time.sleep(1)
+            response = client.chat.completions.create(
+                model=current_model,
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": user_content}
+                ],
+                temperature=0.2,
+                max_tokens=16000
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            error_msg = getattr(e, 'message', str(e))
+            errors.append(f"Model {current_model} Error: {error_msg}")
+            # Continue to next model on error
+            continue
+
+    raise Exception(f"All Z.AI models failed. Errors: {'; '.join(errors)}")
+
+def get_chat_response(messages: list, context: str, provider: str, model_name: str, google_client=None, openrouter_client=None, zai_client=None, direct_chat: bool = False) -> str:
     """
     Handles chat interaction.
     If direct_chat=True, it chats with the model directly without document context.
@@ -250,9 +300,27 @@ def get_chat_response(messages: list, context: str, provider: str, model_name: s
         except Exception as e:
             return f"Chat Error: {e}"
     
+
+
+    elif provider == "zai":
+        if not zai_client: return "Error: Z.AI Client not configured."
+        
+        # Z.AI uses OpenAI format
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+        
+        try:
+            response = zai_client.chat.completions.create(
+                model=model_name,
+                messages=full_messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            return f"Chat Error: {e}"
+    
     return "Error: Invalid Provider"
 
-def get_embedding(text: str, provider: str = "google", model_name: str = "text-embedding-004", google_client=None) -> list:
+def get_embedding(text: str, provider: str = "google", model_name: str = "text-embedding-004", google_client=None, zai_client=None) -> list:
     """Generates an embedding vector for the given text."""
     try:
         if provider == "google":
@@ -268,12 +336,15 @@ def get_embedding(text: str, provider: str = "google", model_name: str = "text-e
         elif provider == "openrouter":
             # OpenRouter might support embeddings, but it's variable.
             return [] 
+        elif provider == "zai":
+             # Z.AI embedding support? Assuming no or not specified, return empty for now
+            return [] 
     except Exception as e:
         print(f"Embedding check failed: {e}")
         return []
 
 
-def process_chunk(text_chunk: str, google_client=None, openrouter_client=None, provider: str = "google", model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "", formatting_mode: str = "Markdown/HTML", existing_topics: list[str] = None) -> str:
+def process_chunk(text_chunk: str, google_client=None, openrouter_client=None, zai_client=None, provider: str = "google", model_name: str = "gemini-3-flash", card_length: str = "Medium (Standard)", card_density: str = "Normal", enable_highlighting: bool = False, custom_prompt: str = "", formatting_mode: str = "Markdown/HTML", existing_topics: list[str] = None) -> str:
     """
     Sends a text chunk to the selected Provider/Model and retrieves Anki CSV cards.
     formatting_mode: "Plain Text", "Markdown/HTML", or "LaTeX/KaTeX"
@@ -355,6 +426,8 @@ def process_chunk(text_chunk: str, google_client=None, openrouter_client=None, p
             text_resp = response.text
         elif provider == "openrouter":
             text_resp = _generate_with_openrouter(model_name, system_instruction, text_chunk, openrouter_client)
+        elif provider == "zai":
+             text_resp = _generate_with_zai(model_name, system_instruction, text_chunk, zai_client)
         else:
              return "Error: Invalid Provider Selected"
         
@@ -420,7 +493,7 @@ def analyze_toc_with_gemini(toc_text: str, google_client, model_name: str = "gem
     except Exception as e:
         return f"Error analyzing TOC: {str(e)}"
 
-def sort_files_with_gemini(file_names: list[str], google_client=None, openrouter_client=None, model_name: str = "gemma-3-27b-it") -> list[str]:
+def sort_files_with_gemini(file_names: list[str], google_client=None, openrouter_client=None, zai_client=None, model_name: str = "gemma-3-27b-it") -> list[str]:
     """Sorts a list of filenames logically. Supports Google and OpenRouter."""
     prompt = f"""Sort the following list of filenames in the most logical chronological or numerical order (e.g. Lecture 1 before Lecture 2, Chapter 1 before 10).
     
@@ -436,6 +509,10 @@ def sort_files_with_gemini(file_names: list[str], google_client=None, openrouter
             # OpenRouter
             system_instruction = "You are a File Organizer. Output strictly valid JSON."
             resp_text = _generate_with_openrouter(model_name, system_instruction, prompt, openrouter_client)
+        elif is_zai_model(model_name):
+             # Z.AI
+            system_instruction = "You are a File Organizer. Output strictly valid JSON."
+            resp_text = _generate_with_zai(model_name, system_instruction, prompt, zai_client)
         else:
             # Google
             response = _generate_with_retry(
@@ -458,7 +535,7 @@ def sort_files_with_gemini(file_names: list[str], google_client=None, openrouter
         logger.error(f"Unexpected error sorting files: {e}")
         return file_names
 
-def generate_chapter_summary(text_chunk: str, google_client=None, openrouter_client=None, model_name: str = "gemma-3-27b-it") -> str:
+def generate_chapter_summary(text_chunk: str, google_client=None, openrouter_client=None, zai_client=None, model_name: str = "gemma-3-27b-it") -> str:
     """Generates a brief summary of a chapter. Supports Google and OpenRouter."""
     input_text = text_chunk[:MAX_SUMMARY_TEXT]
     
@@ -469,6 +546,9 @@ def generate_chapter_summary(text_chunk: str, google_client=None, openrouter_cli
             # OpenRouter
             system_instruction = "You are a Medical Text Summarizer. Be concise and focus on high-yield medical facts."
             return _generate_with_openrouter(model_name, system_instruction, prompt, openrouter_client)
+        elif is_zai_model(model_name):
+            system_instruction = "You are a Medical Text Summarizer. Be concise and focus on high-yield medical facts."
+            return _generate_with_zai(model_name, system_instruction, prompt, zai_client)
         else:
             # Google/Gemini
             response = _generate_with_retry(
@@ -482,7 +562,7 @@ def generate_chapter_summary(text_chunk: str, google_client=None, openrouter_cli
     except Exception as e:
         return f"Summary failed: {str(e)}"
 
-def generate_full_summary(chapter_summaries: list[str], google_client=None, openrouter_client=None, model_name: str = "gemma-3-27b-it") -> str:
+def generate_full_summary(chapter_summaries: list[str], google_client=None, openrouter_client=None, zai_client=None, model_name: str = "gemma-3-27b-it") -> str:
     """Aggregates chapter summaries into a document abstract. Supports Google and OpenRouter."""
     joined_summaries = "\n- ".join(chapter_summaries)
     prompt = f"Create a coherent summary/abstract of the entire document based on these chapter summaries:\n\n- {joined_summaries}"
@@ -492,6 +572,9 @@ def generate_full_summary(chapter_summaries: list[str], google_client=None, open
             # OpenRouter
             system_instruction = "You are a Medical Literature Abstractor."
             return _generate_with_openrouter(model_name, system_instruction, prompt, openrouter_client)
+        elif is_zai_model(model_name):
+            system_instruction = "You are a Medical Literature Abstractor."
+            return _generate_with_zai(model_name, system_instruction, prompt, zai_client)
         else:
             # Google
             response = _generate_with_retry(
@@ -505,7 +588,7 @@ def generate_full_summary(chapter_summaries: list[str], google_client=None, open
     except Exception as e:
         return f"Full summary failed: {str(e)}"
 
-def detect_chapters_in_text(text: str, file_name: str, google_client=None, openrouter_client=None, model_name: str = "gemma-3-27b-it") -> list:
+def detect_chapters_in_text(text: str, file_name: str, google_client=None, openrouter_client=None, zai_client=None, model_name: str = "gemma-3-27b-it") -> list:
     """
     Detects chapters within a text document using AI.
     Returns: [{"title": "Chapter 1 Name", "description": "..."}, ...]
@@ -539,6 +622,9 @@ Rules:
         if is_openrouter_model(model_name):
             system_instruction = "You are a Document Chapter Analyzer. Output strictly valid JSON."
             resp_text = _generate_with_openrouter(model_name, system_instruction, prompt, openrouter_client)
+        elif is_zai_model(model_name):
+            system_instruction = "You are a Document Chapter Analyzer. Output strictly valid JSON."
+            resp_text = _generate_with_zai(model_name, system_instruction, prompt, zai_client)
         else:
             response = _generate_with_retry(
                 model_name,
@@ -563,6 +649,11 @@ Rules:
 def is_openrouter_model(model_name: str) -> bool:
     """Check if model name indicates OpenRouter provider."""
     return "/" in model_name
+
+def is_zai_model(model_name: str) -> bool:
+    """Check if model name indicates Z.AI provider."""
+    # Z.AI models: GLM-4.7, GLM-4.5-air
+    return model_name.startswith("GLM-")
 
 
 def extract_json_from_text(text: str) -> list:

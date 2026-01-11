@@ -75,7 +75,7 @@ class SQLiteVectorStore:
         except Exception as e:
             logger.error(f"Failed to load vector cache: {e}")
 
-    def add_chunks(self, chunks: List[str], google_client, metadata_list: List[Dict] = None) -> None:
+    def add_chunks(self, chunks: List[str], google_client, zai_client=None, metadata_list: List[Dict] = None) -> None:
         """Add chunks to DB and cache."""
         if not metadata_list:
             metadata_list = [{}] * len(chunks)
@@ -95,7 +95,7 @@ class SQLiteVectorStore:
             if len(text) < MIN_CHUNK_LENGTH: 
                 continue
                 
-            emb = get_embedding(text, google_client=google_client) 
+            emb = get_embedding(text, google_client=google_client, zai_client=zai_client) 
             if emb:
                 embedding_np = np.array(emb, dtype=np.float32)
                 metadata = metadata_list[i]
@@ -126,12 +126,12 @@ class SQLiteVectorStore:
             except Exception as e:
                 logger.error(f"Failed to persist chunks: {e}")
 
-    def search(self, query: str, google_client, k: int = 5) -> List[Dict]:
+    def search(self, query: str, google_client, zai_client=None, k: int = 5) -> List[Dict]:
         """Search similar chunks using in-memory cache."""
         if not self.chunks:
             return []
             
-        query_emb = get_embedding(query, google_client=google_client)
+        query_emb = get_embedding(query, google_client=google_client, zai_client=zai_client)
         if not query_emb:
             return []
             
