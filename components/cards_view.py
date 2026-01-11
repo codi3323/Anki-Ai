@@ -21,7 +21,7 @@ def build_deck_tree(df: pd.DataFrame) -> dict:
     tree = {}
     
     # 1. Group by exact deck name first to get leaf stats
-    deck_groups = df.groupby('deck')
+    deck_groups = df.groupby('Deck')
     
     # 2. Build Tree Nodes
     for deck_name, group in deck_groups:
