@@ -269,6 +269,16 @@ def render_cards_view():
     history_manager = CardHistory()
     df = history_manager.get_history_df(email)
     
+    # Normalize columns to Title Case (as expected by Anki logic)
+    # History saves as lowercase, but generator produces Title Case
+    column_mapping = {
+        'deck': 'Deck',
+        'front': 'Front',
+        'back': 'Back',
+        'tag': 'Tag'
+    }
+    df = df.rename(columns=column_mapping)
+    
     if df.empty:
         st.markdown("""
         <div class="empty-state">
