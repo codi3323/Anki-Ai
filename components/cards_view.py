@@ -7,6 +7,8 @@ from utils.history import CardHistory
 from utils.data_processing import push_notes_to_anki, format_cards_for_ankiconnect, check_ankiconnect
 from datetime import datetime
 import logging
+import json
+import streamlit.components.v1 as components
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +121,11 @@ def render_deck_node(node_key, node, level=0):
                  # Push (Aggregate)
                  if st.button("📤 Push", key=f"push_{full_name}", help="Push this deck and all subdecks to Anki"):
                      push_deck_tree(node)
+            
+            with ac1:
+                 # Browser Push
+                 if st.button("🌐 Browser Push", key=f"bpush_{full_name}", help="Direct push via your browser (Good for Cloud/Docker)"):
+                     trigger_browser_push(node['total_df'])
 
     # Render Self Cards actions if needed? 
     # Actually the aggregate 'Push' handles self+children, which is usually what you want for a parent.
@@ -165,6 +172,70 @@ def push_deck_tree(node):
             st.error("Failed to push cards.")
             if errors:
                 st.error(f"Error: {errors[0]}")
+
+def trigger_browser_push(df):
+    """Generates JS to push cards directly from browser."""
+    # 1. Show instructions
+    st.info("Attempting to push from browser...")
+    
+    # 2. Prepare Data
+    notes = format_cards_for_ankiconnect(df)
+    unique_decks = list(set(df['Deck'].tolist()))
+    
+    notes_json = json.dumps(notes)
+    decks_json = json.dumps(unique_decks)
+    
+    # 3. Generate JS
+    js_code = f"""
+    <script>
+    async function pushToAnki() {{
+        const notes = {notes_json};
+        const decks = {decks_json};
+        
+        // First, create all decks
+        for (const deck of decks) {{
+            try {{
+                await fetch('http://localhost:8765', {{
+                    method: 'POST',
+                    body: JSON.stringify({{
+                        "action": "createDeck",
+                        "version": 6,
+                        "params": {{ "deck": deck }}
+                    }}),
+                    headers: {{ 'Content-Type': 'application/json' }}
+                }});
+            }} catch (e) {{
+                console.log("Deck creation info: " + e);
+            }}
+        }}
+        
+        // Then add notes
+        const payload = {{
+            "action": "addNotes",
+            "version": 6,
+            "params": {{ "notes": notes }}
+        }};
+        try {{
+            const response = await fetch('http://localhost:8765', {{
+                method: 'POST',
+                body: JSON.stringify(payload),
+                headers: {{ 'Content-Type': 'application/json' }}
+            }});
+            const result = await response.json();
+            if (result.error) {{
+                alert('AnkiConnect Error: ' + result.error);
+            }} else {{
+                const successCount = result.result.filter(id => id !== null).length;
+                alert('Successfully pushed ' + successCount + ' cards via Browser!');
+            }}
+        }} catch (err) {{
+            alert('Failed to connect to Local Anki.\\n\\n1. Open Anki\\n2. Tools > Add-ons > AnkiConnect > Config\\n3. Set webCorsOriginList to ["*"]\\n4. Restart Anki');
+        }}
+    }}
+    pushToAnki();
+    </script>
+    """
+    components.html(js_code, height=0)
 
 
 def render_cards_view():
