@@ -90,6 +90,27 @@ def render_sidebar():
         developer_mode = st.toggle("Developer Mode", value=False)
         show_general_chat = st.toggle("Show General AI Chat", value=False, help="Enable the general AI chat panel on the right side")
         
+        # AnkiConnect Configuration
+        st.divider()
+        with st.expander("🔗 AnkiConnect Settings", expanded=False):
+            st.caption("For local use, keep default. For Cloud, use a tunnel.")
+            anki_url = st.text_input(
+                "AnkiConnect URL", 
+                value=os.getenv("ANKI_CONNECT_URL", "http://localhost:8765"),
+                help="Default: http://localhost:8765. For Streamlit Cloud, use ngrok or similar."
+            )
+            st.markdown("""
+**To use from Streamlit Cloud:**
+1. Install [ngrok](https://ngrok.com/download) on your computer
+2. Run Anki with AnkiConnect addon
+3. In terminal: `ngrok http 8765`
+4. Copy the https URL (e.g., `https://abc123.ngrok.io`)
+5. Paste it above
+            """)
+            
+            # Store in session for use by data_processing
+            st.session_state['anki_connect_url'] = anki_url
+        
         st.divider()
         if st.button("🔒 Clear Session & Keys", type="secondary"):
             st.session_state.clear()
@@ -102,5 +123,7 @@ def render_sidebar():
         "summary_model": summary_model,
         "chunk_size": chunk_size,
         "developer_mode": developer_mode,
-        "show_general_chat": show_general_chat
+        "show_general_chat": show_general_chat,
+        "anki_url": anki_url
     }
+

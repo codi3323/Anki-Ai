@@ -254,8 +254,11 @@ def render_generator(config):
                 
                 with col_push:
                      if st.button("🚀 Push to Anki (AnkiConnect)"):
+                         # Get URL from session state
+                         anki_url = st.session_state.get('anki_connect_url', 'http://localhost:8765')
+                         
                          # Check connection first
-                         is_reachable, msg = check_ankiconnect()
+                         is_reachable, msg = check_ankiconnect(anki_url)
                          if not is_reachable:
                              st.error(f"❌ {msg}")
                          else:
@@ -266,7 +269,7 @@ def render_generator(config):
                              
                              for i, row in st.session_state['result_df'].iterrows():
                                  tags = [row['Tag']] if row['Tag'] else []
-                                 if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags):
+                                 if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags, anki_url):
                                      success_count += 1
                                  my_bar.progress(min((i+1)/total, 1.0))
                              
@@ -333,20 +336,25 @@ def render_generator(config):
                         
                         with col_single_push:
                             if st.button(f"🚀 Push {ch['title']} to Anki", key=f"push_btn_{idx}"):
-                                success_count = 0
-                                total = len(df_s)
-                                my_bar = st.progress(0)
-                                
-                                for i, row in df_s.iterrows():
-                                    tags = [row['Tag']] if row['Tag'] else []
-                                    if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags):
-                                        success_count += 1
-                                    my_bar.progress(min((i+1)/total, 1.0))
-                                
-                                if success_count > 0:
-                                    st.success(f"Pushed {success_count}/{total} cards!")
+                                anki_url = st.session_state.get('anki_connect_url', 'http://localhost:8765')
+                                is_reachable, msg = check_ankiconnect(anki_url)
+                                if not is_reachable:
+                                    st.error(f"❌ {msg}")
                                 else:
-                                    st.warning("Failed to push. Ensure Anki is open and AnkiConnect is installed.")
+                                    success_count = 0
+                                    total = len(df_s)
+                                    my_bar = st.progress(0)
+                                    
+                                    for i, row in df_s.iterrows():
+                                        tags = [row['Tag']] if row['Tag'] else []
+                                        if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags, anki_url):
+                                            success_count += 1
+                                        my_bar.progress(min((i+1)/total, 1.0))
+                                    
+                                    if success_count > 0:
+                                        st.success(f"Pushed {success_count}/{total} cards!")
+                                    else:
+                                        st.warning("Cards were not added. They may already exist in the deck.")
                     
                     if new_title != ch['title']:
                         st.session_state['chapters_data'][idx]['title'] = new_title

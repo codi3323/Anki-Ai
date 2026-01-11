@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 # Constants
 ANKICONNECT_TIMEOUT = 5  # seconds
 
-def check_ankiconnect() -> tuple[bool, str]:
+def check_ankiconnect(anki_url: str = None) -> tuple[bool, str]:
     """
     Check if AnkiConnect is reachable.
     Returns (is_reachable, error_message).
     """
-    import os
-    anki_url = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
+    if not anki_url:
+        anki_url = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
     
     try:
         response = requests.post(
@@ -28,12 +28,12 @@ def check_ankiconnect() -> tuple[bool, str]:
         )
         result = response.json()
         if result.get("result"):
-            return True, f"AnkiConnect v{result['result']} running at {anki_url}"
-        return False, f"AnkiConnect responded but returned error: {result.get('error')}"
+            return True, f"AnkiConnect v{result['result']} at {anki_url}"
+        return False, f"AnkiConnect error: {result.get('error')}"
     except requests.exceptions.ConnectionError:
         if "localhost" in anki_url:
-            return False, "Cannot reach AnkiConnect at localhost:8765. If running on Streamlit Cloud, AnkiConnect only works when running the app locally. Download the cards and import manually, or run: streamlit run app.py"
-        return False, f"Cannot connect to AnkiConnect at {anki_url}"
+            return False, "Cannot reach localhost:8765. Use ngrok tunnel for Cloud access."
+        return False, f"Cannot connect to {anki_url}"
     except requests.exceptions.Timeout:
         return False, "AnkiConnect request timed out"
     except Exception as e:
@@ -61,12 +61,14 @@ def deduplicate_cards(new_cards: pd.DataFrame, existing_questions: list[str]) ->
             
     return new_cards.loc[unique_indices]
 
-def push_card_to_anki(front: str, back: str, deck: str, tags: list = None) -> bool:
+def push_card_to_anki(front: str, back: str, deck: str, tags: list = None, anki_url: str = None) -> bool:
     """
     Pushes a single card to Anki via AnkiConnect.
     Returns True if successful.
     """
     if tags is None: tags = []
+    if not anki_url:
+        anki_url = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
     
     note = {
         "deckName": deck,
@@ -91,7 +93,6 @@ def push_card_to_anki(front: str, back: str, deck: str, tags: list = None) -> bo
     }
     
     try:
-        anki_url = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
         response = requests.post(anki_url, json=payload, timeout=ANKICONNECT_TIMEOUT)
         result = response.json()
         if result.get("error") is None:
@@ -102,7 +103,7 @@ def push_card_to_anki(front: str, back: str, deck: str, tags: list = None) -> bo
         logger.warning("AnkiConnect request timed out")
         return False
     except requests.exceptions.ConnectionError:
-        logger.warning("Could not connect to AnkiConnect - is Anki running?")
+        logger.warning("Could not connect to AnkiConnect")
         return False
     except Exception as e:
         logger.error(f"Unexpected error pushing to Anki: {e}")
