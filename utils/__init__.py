@@ -35,7 +35,7 @@ from utils.data_processing import (
     deduplicate_cards,
 )
 
-from utils.rag import SimpleVectorStore
+from utils.rag import SQLiteVectorStore
 
 __all__ = [
     # LLM Handler
@@ -60,5 +60,5 @@ __all__ = [
     "push_card_to_anki",
     "deduplicate_cards",
     # RAG
-    "SimpleVectorStore",
+    "SQLiteVectorStore",
 ]
