@@ -451,6 +451,7 @@ class UserManager:
             data[email]["api_keys"] = encrypted_keys
             self._save_data(data)
         
+        return decrypted_keys
 
     def create_session(self, email):
         """
