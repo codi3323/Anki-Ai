@@ -52,28 +52,34 @@ class SQLiteVectorStore:
 
     def _load_cache(self) -> None:
         """Load all chunks from DB into memory."""
+        conn = None
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT text, metadata, embedding FROM chunks")
-                rows = cursor.fetchall()
-                
-                self.chunks = []
-                for text, meta_json, emb_blob in rows:
-                    try:
-                        embedding = np.frombuffer(emb_blob, dtype=np.float32)
-                        metadata = json.loads(meta_json) if meta_json else {}
-                        self.chunks.append({
-                            "text": text,
-                            "metadata": metadata,
-                            "embedding": embedding
-                        })
-                    except Exception as load_err:
-                        logger.warning(f"Skipping corrupted chunk: {load_err}")
-                
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT text, metadata, embedding FROM chunks")
+            rows = cursor.fetchall()
+
+            self.chunks = []
+            for text, meta_json, emb_blob in rows:
+                try:
+                    embedding = np.frombuffer(emb_blob, dtype=np.float32)
+                    metadata = json.loads(meta_json) if meta_json else {}
+                    self.chunks.append({
+                        "text": text,
+                        "metadata": metadata,
+                        "embedding": embedding
+                    })
+                except (ValueError, json.JSONDecodeError) as load_err:
+                    logger.warning(f"Skipping corrupted chunk: {load_err}")
+
             logger.info(f"Loaded {len(self.chunks)} chunks from persistence.")
+        except sqlite3.Error as e:
+            logger.error(f"Database error loading vector cache: {e}")
         except Exception as e:
             logger.error(f"Failed to load vector cache: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def add_chunks(self, chunks: List[str], google_client, zai_client=None, metadata_list: List[Dict] = None) -> None:
         """Add chunks to DB and cache."""
@@ -115,16 +121,22 @@ class SQLiteVectorStore:
 
         # Bulk insert to DB
         if new_entries:
+            conn = None
             try:
-                with sqlite3.connect(self.db_path) as conn:
-                    cursor = conn.cursor()
-                    cursor.executemany(
-                        "INSERT INTO chunks (text, metadata, embedding) VALUES (?, ?, ?)",
-                        new_entries
-                    )
-                    conn.commit()
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.executemany(
+                    "INSERT INTO chunks (text, metadata, embedding) VALUES (?, ?, ?)",
+                    new_entries
+                )
+                conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Database error persisting chunks: {e}")
             except Exception as e:
                 logger.error(f"Failed to persist chunks: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
     def search(self, query: str, google_client, zai_client=None, k: int = 5) -> List[Dict]:
         """Search similar chunks using in-memory cache."""
@@ -154,20 +166,26 @@ class SQLiteVectorStore:
         
     def clear(self) -> None:
         """Clear DB and cache."""
+        conn = None
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM chunks")
-                conn.commit()
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chunks")
+            conn.commit()
             self.chunks = []
             if os.path.exists(self.db_path):
-                 try:
-                     # Optional: vacuum to reclaim space, or remove file
-                     pass 
-                 except: 
-                     pass
+                try:
+                    # Vacuum to reclaim space
+                    conn.execute("VACUUM")
+                except sqlite3.Error:
+                    pass
+        except sqlite3.Error as e:
+            logger.error(f"Database error clearing vector store: {e}")
         except Exception as e:
             logger.error(f"Failed to clear vector store: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def __len__(self) -> int:
         return len(self.chunks)

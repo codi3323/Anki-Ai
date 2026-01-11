@@ -151,8 +151,10 @@ def render_standalone_chat():
             valid_files = []
             if uploaded_files:
                 for f in uploaded_files:
-                    if f.size > MAX_FILE_SIZE_BYTES:
-                        st.warning(f"⚠️ {f.name} exceeds {MAX_FILE_SIZE_MB}MB limit and will be skipped.")
+                    # Validate file security
+                    is_valid, error_msg = validate_file_security(f, f.name)
+                    if not is_valid:
+                        st.warning(f"⚠️ {f.name}: {error_msg}")
                     else:
                         valid_files.append(f)
                 uploaded_files = valid_files
@@ -165,21 +167,31 @@ def render_standalone_chat():
             if uploaded_files:
                 if 'processed_files_cache' not in st.session_state:
                     st.session_state.processed_files_cache = set()
-                
+
                 context_texts = []
                 for file in uploaded_files:
                     file.seek(0)
                     fname = file.name
+                    file_ext = os.path.splitext(fname)[1].lower()
                     try:
-                        if fname.endswith('.pdf'):
+                        if file_ext == '.pdf':
                             text = extract_text_from_pdf(file)
                         else:
-                            text = file.read().decode('utf-8')
-                        
+                            text = file.read().decode('utf-8', errors='replace')
+
+                        # Sanitize text content
+                        text = sanitize_text_content(text)
+                        if not text.strip():
+                            st.warning(f"⚠️ {fname}: No content extracted")
+                            continue
+
                         context_texts.append(f"[{fname}]\n{text}")
+                    except UnicodeDecodeError:
+                        st.error(f"Error {fname}: Unable to decode file content. Please ensure it's a valid text file.")
                     except Exception as e:
-                        st.error(f"Error {fname}: {e}")
-                
+                        logger.error(f"Error processing file {fname}: {e}")
+                        st.error(f"Error {fname}: Failed to process file")
+
                 if context_texts:
                     st.session_state.chat_context = "\n\n---\n\n".join(context_texts)
                     st.success(f"✅ {len(context_texts)} files active")

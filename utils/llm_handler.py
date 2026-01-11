@@ -119,7 +119,7 @@ def signal_rate_limit(message: str):
         if st.session_state.get('using_free_tier', False):
             st.session_state['free_tier_rate_limited'] = True
             st.session_state['rate_limit_message'] = message
-    except:
+    except (ImportError, AttributeError, RuntimeError):
         pass  # Not in Streamlit context
 
 def _retry_on_api_error(exception):

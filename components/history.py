@@ -6,6 +6,9 @@ import streamlit as st
 import pandas as pd
 from utils.history import CardHistory
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def render_history():
@@ -34,7 +37,8 @@ def render_history():
             try:
                 latest = pd.to_datetime(df['timestamp']).max()
                 st.metric("Last Created", latest.strftime("%Y-%m-%d"))
-            except:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error parsing timestamp: {e}")
                 st.metric("Last Created", "N/A")
 
     st.divider()
@@ -79,7 +83,8 @@ def render_history():
         if 'Created' in display_df.columns:
             try:
                 display_df['Created'] = pd.to_datetime(display_df['Created']).dt.strftime("%Y-%m-%d %H:%M")
-            except:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error formatting timestamp: {e}")
                 pass
 
         st.dataframe(

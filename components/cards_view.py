@@ -5,6 +5,9 @@ import streamlit as st
 import pandas as pd
 from utils.history import CardHistory
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def render_cards_view():
@@ -140,7 +143,8 @@ def render_cards_view():
                 df['date'] = pd.to_datetime(df['timestamp']).dt.date
                 today_count = len(df[df['date'] == today])
                 st.metric("📅 Today", today_count)
-            except:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error calculating today's cards: {e}")
                 st.metric("📅 Today", 0)
     
     with col4:
@@ -149,7 +153,8 @@ def render_cards_view():
                 week_ago = (datetime.now() - timedelta(days=7)).date()
                 week_count = len(df[df['date'] >= week_ago])
                 st.metric("📊 This Week", week_count)
-            except:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error calculating week cards: {e}")
                 st.metric("📊 This Week", 0)
     
     st.divider()

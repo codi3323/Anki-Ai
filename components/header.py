@@ -103,11 +103,10 @@ def render_header():
 def render_settings_modal(config):
     """Renders the settings modal overlay."""
     import os
-    
+
     if not st.session_state.get('show_settings_modal', False):
         return
-    
-    from utils.auth import UserManager
+
     auth_manager = UserManager()
     email = st.session_state.get('user_email')
     is_guest = st.session_state.get('is_guest', False)
