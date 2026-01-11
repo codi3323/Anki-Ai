@@ -203,33 +203,33 @@ def _generate_cards(provider, model_name, chunk_size, card_length, card_density,
         progress_bar.progress(1.0)
         status_text.empty()
         
-            if all_dfs:
-                final_df = pd.concat(all_dfs, ignore_index=True)
-                final_df = final_df[["Front", "Back", "Deck", "Tag"]]
-                st.session_state['result_df'] = final_df
-                # Create proper Anki TSV with header comments
-                anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
-                tsv_content = final_df.to_csv(sep="\t", index=False, header=False, quoting=1)
-                st.session_state['result_csv'] = anki_header + tsv_content
-                st.success(f"Generated {len(final_df)} cards!")
-                
-                # --- Save to History ---
-                try:
-                    from utils.history import CardHistory
-                    email = st.session_state.get('user_email', 'Guest')
-                    # Don't save for Guest if we want strictness, but let's allow "Guest" history for the session
-                    if email and email != "Guest":
-                        hist = CardHistory()
-                        hist.add_cards(email, final_df, source="Batch Generator")
-                    elif email == "Guest":
-                         # Optional: Could save to temporary session history or just skip.
-                         # User asked for "guest mode without login", so maybe ephemeral.
-                         # But let's skip persistence for Guest for now as per "Guest constraints".
-                         pass
-                except Exception as ex:
-                    logger.error(f"Failed to save history: {ex}")
-            else:
-                st.error("No cards generated. Check errors above.")
+        if all_dfs:
+            final_df = pd.concat(all_dfs, ignore_index=True)
+            final_df = final_df[["Front", "Back", "Deck", "Tag"]]
+            st.session_state['result_df'] = final_df
+            # Create proper Anki TSV with header comments
+            anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
+            tsv_content = final_df.to_csv(sep="\t", index=False, header=False, quoting=1)
+            st.session_state['result_csv'] = anki_header + tsv_content
+            st.success(f"Generated {len(final_df)} cards!")
+            
+            # --- Save to History ---
+            try:
+                from utils.history import CardHistory
+                email = st.session_state.get('user_email', 'Guest')
+                # Don't save for Guest if we want strictness, but let's allow "Guest" history for the session
+                if email and email != "Guest":
+                    hist = CardHistory()
+                    hist.add_cards(email, final_df, source="Batch Generator")
+                elif email == "Guest":
+                        # Optional: Could save to temporary session history or just skip.
+                        # User asked for "guest mode without login", so maybe ephemeral.
+                        # But let's skip persistence for Guest for now as per "Guest constraints".
+                        pass
+            except Exception as ex:
+                logger.error(f"Failed to save history: {ex}")
+        else:
+            st.error("No cards generated. Check errors above.")
     except Exception as e:
         st.error(f"Error: {e}")
 
