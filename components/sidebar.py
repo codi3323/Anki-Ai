@@ -16,17 +16,8 @@ def render_sidebar(cookie_manager=None):
     user_keys = st.session_state.get('user_keys', {})
 
     with st.sidebar:
-        # ... (rest of the sidebar code) ...
-        # (skipping unchanged parts is hard with replace_file_content for signature change + deep logic change)
-        # Wait, I need to match the indentation and structure.
-        # Since I can't use "..." I have to select a chunk.
-        
-        # Let's target the definition and the logout block separately or together if close.
-        # They are far apart (Start of file vs End of file).
-        # Multi-replace is better.
-
-    with st.sidebar:
         # User info
+
         if email:
             st.caption(f"👤 {email}")
         
