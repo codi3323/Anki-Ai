@@ -102,14 +102,19 @@ class UserManager:
         """
         # Check if it's a legacy SHA-256 hash (64 hex chars)
         if len(stored_hash) == 64 and "$" not in stored_hash:
-            # Legacy verification
+            # Legacy verification - deprecated for security
+            logger.warning(f"Login attempted with legacy SHA-256 hash. Password should be reset.")
             legacy_hash = hashlib.sha256(password.encode()).hexdigest()
-            return (stored_hash == legacy_hash), True
-        
-        # Bcrypt verification
+            is_valid = stored_hash == legacy_hash
+            if is_valid:
+                logger.warning(f"Legacy hash verified. User should change password immediately.")
+            return is_valid, True
+
+        # Bcrypt verification (secure)
         try:
             return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8')), False
-        except ValueError:
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Password verification failed: {e}")
             return False, False
 
     def _validate_password_strength(self, password):

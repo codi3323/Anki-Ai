@@ -83,7 +83,7 @@ def _process_files(uploaded_files, detect_chapters, chunk_size, summary_model, s
                             st.session_state.vector_store.add_chunks(chunks, google_client=st.session_state.google_client, zai_client=st.session_state.zai_client, metadata_list=[{"source": f"{fname} - {ch_title}"}]*len(chunks))
                             
                             file_chapters.append({
-                                "title": f"{fname} - {ch_title}",
+                                "title": ch_title,
                                 "text": ch_text_cleaned,
                                 "summary": ch_summary,
                                 "parent_file": fname
@@ -176,25 +176,19 @@ def _generate_cards(provider, model_name, chunk_size, card_length, card_density,
                                 new_questions = df_chunk["Front"].tolist()
                                 st.session_state['generated_questions'].extend(new_questions)
                         
-                        clean_title = chapter['title'].replace(" ", "_").replace(":", "-")
-                        parent_file = chapter.get('parent_file', chapter['title']).replace(" ", "_").replace(":", "-")
+                        clean_title = chapter['title'].replace(":", "-")
                         
                         if "Subdecks" in deck_type:
-                            # If chapters detected, create: Base::ParentFile::Chapter
-                            if 'parent_file' in chapter and chapter['parent_file'] != chapter['title']:
-                                df_chunk["Deck"] = f"{base_deck_name}::{parent_file}::{clean_title}"
-                            else:
-                                df_chunk["Deck"] = f"{base_deck_name}::{clean_title}"
+                            # Chapters as direct subdecks: Base::Chapter
+                            df_chunk["Deck"] = f"{base_deck_name}::{clean_title}"
                             df_chunk["Tag"] = ""
                         elif "Tags" in deck_type:
                                 df_chunk["Deck"] = base_deck_name
                                 df_chunk["Tag"] = clean_title
                         else:
-                                if 'parent_file' in chapter and chapter['parent_file'] != chapter['title']:
-                                    df_chunk["Deck"] = f"{base_deck_name}::{parent_file}::{clean_title}"
-                                else:
-                                    df_chunk["Deck"] = f"{base_deck_name}::{clean_title}"
-                                df_chunk["Tag"] = clean_title
+                            # Default/Both behavior: Base::Chapter
+                            df_chunk["Deck"] = f"{base_deck_name}::{clean_title}"
+                            df_chunk["Tag"] = clean_title
                         all_dfs.append(df_chunk)
                     except Exception as e:
                         if developer_mode:
@@ -475,7 +469,7 @@ def render_generator(config):
                             )
                             try:
                                 df_single = robust_csv_parse(csv_text)
-                                clean_title = ch['title'].replace(" ", "_").replace(":", "-")
+                                clean_title = ch['title'].replace(":", "-")
                                 df_single["Deck"] = f"{base_deck_name}::{clean_title}"
                                 df_single["Tag"] = clean_title
                                 anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"

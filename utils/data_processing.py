@@ -84,8 +84,12 @@ def push_card_to_anki(front: str, back: str, deck: str, tags: list = None, anki_
     
     try:
         requests.post(anki_url, json=create_deck_payload, timeout=ANKICONNECT_TIMEOUT)
-    except Exception:
-        pass  # Ignore errors, addNote will fail if deck creation truly fails
+    except requests.exceptions.Timeout:
+        logger.debug("Deck creation request timed out (will try with addNote)")
+    except requests.exceptions.ConnectionError:
+        logger.debug("Deck creation failed (will try with addNote)")
+    except Exception as e:
+        logger.debug(f"Deck creation attempt failed: {e}")
     
     note = {
         "deckName": deck,

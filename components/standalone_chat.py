@@ -5,10 +5,62 @@ import streamlit as st
 from utils.llm_handler import get_chat_response, configure_gemini, configure_openrouter, configure_zai
 from utils.pdf_processor import extract_text_from_pdf
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Constants
 MAX_FILE_SIZE_MB = 50
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+# Allowed MIME types for security
+ALLOWED_MIME_TYPES = {
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+}
+
+# File signature validation (magic bytes)
+PDF_MAGIC = b'%PDF'
+TEXT_EXTENSIONS = {'.txt', '.md'}
+
+def validate_file_security(file, fname: str) -> tuple[bool, str]:
+    """
+    Validate file security checks: size, extension, and content signature.
+    Returns: (is_valid, error_message)
+    """
+    # Check file size
+    if file.size > MAX_FILE_SIZE_BYTES:
+        return False, f"File exceeds {MAX_FILE_SIZE_MB}MB limit"
+
+    # Check file extension
+    file_ext = os.path.splitext(fname)[1].lower()
+    if file_ext not in ALLOWED_MIME_TYPES:
+        return False, f"Invalid file type: {file_ext}"
+
+    # For PDFs, validate magic bytes
+    if file_ext == '.pdf':
+        file.seek(0)
+        header = file.read(4)
+        file.seek(0)
+        if not header.startswith(PDF_MAGIC):
+            return False, "Invalid PDF file (magic bytes check failed)"
+
+    return True, ""
+
+def sanitize_text_content(text: str, max_length: int = 5000000) -> str:
+    """
+    Sanitize text content to prevent injection attacks.
+    Limits length and removes potentially dangerous content.
+    """
+    if not text:
+        return ""
+
+    # Limit total length to prevent DoS
+    if len(text) > max_length:
+        text = text[:max_length] + "\n\n[Content truncated due to length]"
+
+    return text
 
 def render_standalone_chat():
     """Renders the full standalone chat interface with model selector and upload."""

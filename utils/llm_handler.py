@@ -40,7 +40,7 @@ def configure_openrouter(api_key: str):
     """
     if api_key and api_key.strip():
         return openai.OpenAI(
-            base_url="https://openrouter.ai/api/v1",
+            base_url=os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1"),
             api_key=api_key,
         )
     return None
@@ -52,7 +52,7 @@ def configure_zai(api_key: str):
     """
     if api_key and api_key.strip():
         return openai.OpenAI(
-            base_url="https://api.z.ai/api/coding/paas/v4",
+            base_url=os.getenv("ZAI_API_URL", "https://api.z.ai/api/coding/paas/v4"),
             api_key=api_key,
         )
     return None
@@ -304,8 +304,12 @@ def get_chat_response(messages: list, context: str, provider: str, model_name: s
         try:
             response = _generate_with_retry(model_name, gemini_hist, config, client_config, fallback_to_flash_lite=True)
             return response.text
+        except RateLimitError as e:
+            logger.error(f"Rate limit error in chat: {e}")
+            return f"Rate limit exceeded. Please try again later."
         except Exception as e:
-            return f"Chat Error: {e}"
+            logger.error(f"Chat error with Google provider: {e}")
+            return "Chat error occurred. Please try again."
 
     elif provider == "openrouter":
         if not openrouter_client: return "Error: OpenRouter Client not configured."
@@ -323,8 +327,12 @@ def get_chat_response(messages: list, context: str, provider: str, model_name: s
                 temperature=0.7
             )
             return response.choices[0].message.content
+        except RateLimitError as e:
+            logger.error(f"Rate limit error in chat: {e}")
+            return f"Rate limit exceeded. Please try again later."
         except Exception as e:
-            return f"Chat Error: {e}"
+            logger.error(f"Chat error with OpenRouter provider: {e}")
+            return "Chat error occurred. Please try again."
     
 
 
@@ -341,8 +349,12 @@ def get_chat_response(messages: list, context: str, provider: str, model_name: s
                 temperature=0.7
             )
             return response.choices[0].message.content
+        except RateLimitError as e:
+            logger.error(f"Rate limit error in chat: {e}")
+            return f"Rate limit exceeded. Please try again later."
         except Exception as e:
-            return f"Chat Error: {e}"
+            logger.error(f"Chat error with Z.AI provider: {e}")
+            return "Chat error occurred. Please try again."
     
     return "Error: Invalid Provider"
 
@@ -546,19 +558,21 @@ def sort_files_with_gemini(file_names: list[str], google_client=None, openrouter
                 prompt,
                 types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0),
                 google_client,
-                fallback_to_flash_lite=False 
+                fallback_to_flash_lite=False
             )
             resp_text = response.text
-            
-        sorted_list = json.loads(resp_text)
-        if len(sorted_list) == len(file_names):
+
+        try:
+            sorted_list = json.loads(resp_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from text if parsing fails
+            sorted_list = extract_json_from_text(resp_text)
+
+        if isinstance(sorted_list, list) and len(sorted_list) == len(file_names):
             return sorted_list
         return file_names
-    except (json.JSONDecodeError, ValueError) as e:
-        logger.warning(f"Failed to sort files with AI: {e}")
-        return file_names
     except Exception as e:
-        logger.error(f"Unexpected error sorting files: {e}")
+        logger.error(f"Failed to sort files with AI: {e}")
         return file_names
 
 def generate_chapter_summary(text_chunk: str, google_client=None, openrouter_client=None, zai_client=None, model_name: str = "gemma-3-27b-it") -> str:
