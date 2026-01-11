@@ -78,83 +78,82 @@ def extract_chapters_from_pdf(pdf_stream, ai_extracted_toc: list = None) -> list
     try:
         pdf_stream.seek(0)
         doc = fitz.open(stream=pdf_stream.read(), filetype="pdf")
-    except Exception as e:
-        raise ValueError(f"Error opening PDF: {e}")
 
-    toc = []
-    if ai_extracted_toc:
-        # Convert AI TOC [{'title':..., 'page':...}] to fitz format [[lvl, title, page, ...]]
-        # Fitz expects: [level, title, page, dest]
-        # We assume level 1 for all api results
-        for item in ai_extracted_toc:
-            # AI pages are likely 1-indexed printed numbers. 
-            # We treat them as 1-indexed for consistency with fitz .get_toc() output which usually uses 1-based page numbers for display, 
-            # BUT fitz `get_toc(simple=True)` returns 1-based page numbers usually.
-            # Actually PyMuPDF `get_toc()` returns [[lvl, title, page, ...]]. The 'page' IS 1-based.
-            toc.append([1, item.get('title', 'Chapter'), item.get('page', 1)])
-    else:
-        toc = doc.get_toc()
-    
-    # If no TOC, return entire doc as one chapter
-    if not toc:
-        text = []
-        for page in doc:
-            text.append(page.get_text())
-        return [{"title": "Full Document", "text": "\n".join(text)}]
-
-    chapters = []
-    page_count = doc.page_count
-    
-    # Calculate offset for Roman numeral prefaces
-    pdf_offset = get_page_offset(doc)
-    
-    for i in range(len(toc)):
-        item = toc[i]
-        level = item[0]
-        title = item[1]
-        start_page = item[2]
-        # Ignore remaining fields like 'dest' which might not exist for AI extracted TOC or simple TOCs
-        
-        # Determine end page
-        if i < len(toc) - 1:
-            next_start = toc[i+1][2]
-            # If next chapter starts on same page, current range is effectively distinct?
-            # Or usually next ch starts on next page.
-            # We'll assume exclusive range [start, next_start)
-            end_page = next_start - 1
+        toc = []
+        if ai_extracted_toc:
+            # Convert AI TOC [{'title':..., 'page':...}] to fitz format [[lvl, title, page, ...]]
+            # Fitz expects: [level, title, page, dest]
+            # We assume level 1 for all api results
+            for item in ai_extracted_toc:
+                # AI pages are likely 1-indexed printed numbers.
+                # We treat them as 1-indexed for consistency with fitz .get_toc() output which usually uses 1-based page numbers for display,
+                # BUT fitz `get_toc(simple=True)` returns 1-based page numbers usually.
+                # Actually PyMuPDF `get_toc()` returns [[lvl, title, page, ...]]. The 'page' IS 1-based.
+                toc.append([1, item.get('title', 'Chapter'), item.get('page', 1)])
         else:
-            end_page = page_count 
-        
-        # Adjust for 0-based indexing AND PDF internal offset
-        # TOC pages are 1-based relative to the "logical" Page 1
-        p_start = max(0, pdf_offset + (start_page - 1))
-        
-        # For end page, we apply similar logic if it's based on logical numbering
-        # Note: end_page calc above was (next_start - 1). 
-        # So next_start matches next logical page.
-        p_end = max(0, pdf_offset + (end_page - 1))
-        
-        # Safety clamp
-        if p_end >= page_count:
-           p_end = page_count - 1 
-        
-        # If the next chapter starts on the same page, we might duplicate text 
-        # if we just grab the whole page. 
-        # However, precise text extraction per coordinate is hard.
-        # We will grab the whole page logic for now as it's standard for this level of granularity.
-        
-        chapter_text_list = []
-        if p_start <= p_end:
-            for p_idx in range(p_start, p_end + 1):
-                chapter_text_list.append(doc.load_page(p_idx).get_text())
-        
-        raw_text = "\n".join(chapter_text_list)
-        chapters.append({
-            "title": title,
-            "text": unicodedata.normalize('NFC', raw_text)
-        })
+            toc = doc.get_toc()
 
-    return chapters
+        # If no TOC, return entire doc as one chapter
+        if not toc:
+            text = []
+            for page in doc:
+                text.append(page.get_text())
+            return [{"title": "Full Document", "text": "\n".join(text)}]
+
+        chapters = []
+        page_count = doc.page_count
+
+        # Calculate offset for Roman numeral prefaces
+        pdf_offset = get_page_offset(doc)
+
+        for i in range(len(toc)):
+            item = toc[i]
+            level = item[0]
+            title = item[1]
+            start_page = item[2]
+            # Ignore remaining fields like 'dest' which might not exist for AI extracted TOC or simple TOCs
+
+            # Determine end page
+            if i < len(toc) - 1:
+                next_start = toc[i+1][2]
+                # If next chapter starts on same page, current range is effectively distinct?
+                # Or usually next ch starts on next page.
+                # We'll assume exclusive range [start, next_start)
+                end_page = next_start - 1
+            else:
+                end_page = page_count
+
+            # Adjust for 0-based indexing AND PDF internal offset
+            # TOC pages are 1-based relative to the "logical" Page 1
+            p_start = max(0, pdf_offset + (start_page - 1))
+
+            # For end page, we apply similar logic if it's based on logical numbering
+            # Note: end_page calc above was (next_start - 1).
+            # So next_start matches next logical page.
+            p_end = max(0, pdf_offset + (end_page - 1))
+
+            # Safety clamp
+            if p_end >= page_count:
+               p_end = page_count - 1
+
+            # If the next chapter starts on the same page, we might duplicate text
+            # if we just grab the whole page.
+            # However, precise text extraction per coordinate is hard.
+            # We will grab the whole page logic for now as it's standard for this level of granularity.
+
+            chapter_text_list = []
+            if p_start <= p_end:
+                for p_idx in range(p_start, p_end + 1):
+                    chapter_text_list.append(doc.load_page(p_idx).get_text())
+
+            raw_text = "\n".join(chapter_text_list)
+            chapters.append({
+                "title": title,
+                "text": unicodedata.normalize('NFC', raw_text)
+            })
+
+        return chapters
+
     except Exception as e:
         raise ValueError(f"Error extracting chapters from PDF: {e}")
     finally:
