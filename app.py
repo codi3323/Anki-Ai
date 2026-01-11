@@ -106,15 +106,21 @@ st.markdown(f"""
     <div class="version-badge">{VERSION}</div>
 """, unsafe_allow_html=True)
 
-# Title
-st.title("🩺 Medical PDF to Anki Converter (AI-Powered)")
-
 # Initialize Session
 init_session_state()
+
+# --- Render Header (Navigation) ---
+# Render header ABOVE the title if logged in
+if st.session_state.get('is_logged_in', False):
+    render_header()
+
+# Title
+st.title("🩺 Medical PDF to Anki Converter (AI-Powered)")
 
 # --- Auth Flow ---
 if not st.session_state.get('is_logged_in', False):
     render_login()
+
     st.stop() # Stop execution here until logged in
 
 # --- Onboarding Flow ---
@@ -148,7 +154,8 @@ if not st.session_state.get('keys_configured', False):
 config = render_sidebar()
 
 # Render Header with Navigation Icons
-render_header()
+# Moved to top of page
+# render_header()
 
 # Render Settings Modal if open
 if st.session_state.get('show_settings_modal', False):
