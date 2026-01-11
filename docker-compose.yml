@@ -27,11 +27,5 @@ services:
     depends_on:
       anki-ai:
         condition: service_healthy
-    volumes:
-      # Mount your Cloudflare tunnel credentials
-      # Run: cloudflared tunnel create <tunnel-name>
-      # Then copy the cert.pem and config.json to ./cloudflared/
-      - ./cloudflared:/home/cloudflared/.cloudflared:ro
     environment:
-      # Optional: Override tunnel name with env var
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
