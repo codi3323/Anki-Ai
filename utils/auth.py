@@ -502,3 +502,16 @@ class UserManager:
             
         return True
 
+    def invalidate_session(self, email, token):
+        """
+        Invalidates a specific session token.
+        """
+        data = self._load_data()
+        if email not in data:
+            return
+            
+        sessions = data[email].get("sessions", {})
+        if token in sessions:
+            del data[email]["sessions"][token]
+            self._save_data(data)
+

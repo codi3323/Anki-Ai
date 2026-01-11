@@ -196,6 +196,10 @@ def render_sidebar(cookie_manager=None):
             if st.button("🚪 Logout", use_container_width=True):
                 if cookie_manager:
                     try:
+                        cookies = cookie_manager.get_all()
+                        token = cookies.get("session_token")
+                        if token and email:
+                            auth_manager.invalidate_session(email, token)
                         cookie_manager.delete("session_token")
                     except Exception as e:
                         # Sometimes deleting fails if cookie doesn't exist etc.
