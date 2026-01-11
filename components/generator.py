@@ -236,7 +236,7 @@ def render_generator(config):
         # New Deck Name Field
         uploaded_files_preview = st.session_state.get("anki_uploader", [])
         default_deck = "Anki-AI"
-        if uploaded_files_preview:
+        if uploaded_files_preview and hasattr(uploaded_files_preview[0], 'name'):
             first_fname = uploaded_files_preview[0].name.replace(".pdf", "").replace("_", " ").title()
             default_deck = f"Anki-AI: {first_fname}"
         
