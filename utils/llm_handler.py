@@ -105,10 +105,30 @@ from tenacity import (
     before_sleep_log
 )
 
+class RateLimitError(Exception):
+    """Custom exception for rate limit errors that should be shown to users."""
+    def __init__(self, message: str, provider: str = None):
+        self.message = message
+        self.provider = provider
+        super().__init__(self.message)
+
+def signal_rate_limit(message: str):
+    """Signal to the Streamlit session that a rate limit was hit."""
+    try:
+        import streamlit as st
+        if st.session_state.get('using_free_tier', False):
+            st.session_state['free_tier_rate_limited'] = True
+            st.session_state['rate_limit_message'] = message
+    except:
+        pass  # Not in Streamlit context
+
 def _retry_on_api_error(exception):
     """Return True if exception is a 429 or 503 error."""
     msg = str(exception).lower()
-    return "429" in msg or "resource_exhausted" in msg or "503" in msg
+    is_rate_limit = "429" in msg or "resource_exhausted" in msg or "503" in msg
+    if is_rate_limit:
+        signal_rate_limit(f"API rate limit hit: {str(exception)[:100]}")
+    return is_rate_limit
 
 @retry(
     retry=retry_if_exception_type(Exception),
@@ -199,11 +219,13 @@ def _generate_with_openrouter(model_name: str, system_instruction: str, user_con
             
             # Only switch model on 429 (Rate Limit) or 503 (Overloaded)
             if "429" in error_msg or "rate limit" in error_msg.lower() or "503" in error_msg:
+                signal_rate_limit(f"OpenRouter rate limit on {current_model}")
                 continue
             else:
                 # For other errors (like 401 Auth), stop and show error
                 raise Exception(f"OpenRouter Critical Error: {error_msg}")
 
+    signal_rate_limit("All OpenRouter models exhausted due to rate limits")
     raise Exception(f"All OpenRouter models failed. Errors: {'; '.join(errors[-3:])}")
 
 def _generate_with_zai(model_name: str, system_instruction: str, user_content: str, client):
@@ -236,9 +258,13 @@ def _generate_with_zai(model_name: str, system_instruction: str, user_content: s
         except Exception as e:
             error_msg = getattr(e, 'message', str(e))
             errors.append(f"Model {current_model} Error: {error_msg}")
+            # Signal rate limit for 429 errors
+            if "429" in error_msg or "rate limit" in error_msg.lower():
+                signal_rate_limit(f"Z.AI rate limit on {current_model}")
             # Continue to next model on error
             continue
 
+    signal_rate_limit("All Z.AI models exhausted due to rate limits")
     raise Exception(f"All Z.AI models failed. Errors: {'; '.join(errors)}")
 
 def get_chat_response(messages: list, context: str, provider: str, model_name: str, google_client=None, openrouter_client=None, zai_client=None, direct_chat: bool = False) -> str:

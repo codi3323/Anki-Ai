@@ -20,7 +20,11 @@ def init_session_state():
         "is_logged_in": False,
         "user_email": None,
         "user_keys": {},
-        "keys_configured": False
+        "keys_configured": False,
+        # Free tier tracking
+        "using_free_tier": False,
+        "free_tier_rate_limited": False,
+        "rate_limit_message": None
     }
     
     for key, value in defaults.items():

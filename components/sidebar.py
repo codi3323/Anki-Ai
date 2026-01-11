@@ -1,11 +1,12 @@
 """
-Sidebar configuration component.
+Sidebar configuration component - Streamlined version.
 """
 import streamlit as st
 import os
 from utils.llm_handler import configure_gemini, configure_openrouter, configure_zai
 from components.session import load_fallback_keys
 from utils.auth import UserManager
+
 
 def render_sidebar():
     """Renders the sidebar and returns configuration."""
@@ -14,13 +15,20 @@ def render_sidebar():
     user_keys = st.session_state.get('user_keys', {})
 
     with st.sidebar:
-        st.header("Configuration")
-        
+        # User info
         if email:
-            st.caption(f"Logged in as: {email}")
-
+            st.caption(f"👤 {email}")
+        
+        st.divider()
+        
         # Provider Selection
-        provider = st.radio("AI Provider", ["Google Gemini", "OpenRouter", "Z.AI"], index=0)
+        st.markdown("##### 🤖 AI Provider")
+        provider = st.radio(
+            "Provider", 
+            ["Google Gemini", "OpenRouter", "Z.AI"], 
+            index=0,
+            label_visibility="collapsed"
+        )
         
         api_key = None
         model_name = None
@@ -35,57 +43,74 @@ def render_sidebar():
             fallback_keys = load_fallback_keys()
             saved_key = user_keys.get("google", "")
             env_key = os.getenv("GOOGLE_API_KEY", "")
+            is_guest = st.session_state.get('is_guest', False)
             
-            if saved_key:
+            if saved_key and not is_guest:
                 api_key = saved_key
                 st.session_state.google_client = configure_gemini(api_key, fallback_keys=fallback_keys)
-                st.success(f"✅ Gemini Key (saved)")
+                st.success("✅ Gemini Ready")
+                st.session_state['using_free_tier'] = False
             elif env_key:
+                # Guests and users without saved keys use environment key
                 api_key = env_key
                 st.session_state.google_client = configure_gemini(api_key, fallback_keys=fallback_keys)
-                st.info("Using Gemini Key from Environment")
+                if is_guest:
+                    st.info("🆓 Free Tier (Guest) - Limited requests")
+                    st.session_state['using_free_tier'] = True
+                else:
+                    st.info("📦 Using Environment Key")
+                    st.session_state['using_free_tier'] = False
             elif fallback_keys:
                 api_key = fallback_keys[0]
                 st.session_state.google_client = configure_gemini(api_key, fallback_keys=fallback_keys[1:])
-                st.info("Using Fallback Gemini Key (Dev Mode)")
+                st.info("🆓 Free Tier (Fallback) - Limited requests")
+                st.session_state['using_free_tier'] = True
             else:
-                st.error("No Gemini Keys found. Add one in ⚙️ API Key Settings below.")
+                st.error("❌ No Gemini Key. Add one in ⚙️ Settings.")
                 api_key = None
                 st.session_state.google_client = configure_gemini(None, fallback_keys=[])
+                st.session_state['using_free_tier'] = False
     
-            # Google Models
             model_options = {
-                "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite (Fastest, 10 RPM)",
-                "gemini-2.5-flash": "Gemini 2.5 Flash (Standard, 5 RPM)",
-                "gemini-3-flash": "Gemini 3.0 Flash (Smarter, 5 RPM)",
-                "gemma-3-27b-it": "Gemma 3 27B (High Throughput, 30 RPM)"
+                "gemini-2.5-flash-lite": "Flash Lite (Fastest)",
+                "gemini-2.5-flash": "Flash (Standard)",
+                "gemini-3-flash": "Flash 3.0 (Smarter)",
+                "gemma-3-27b-it": "Gemma 27B (High TPM)"
             }
-            summary_model = "gemma-3-27b-it" 
+            summary_model = "gemma-3-27b-it"
 
         # --- OpenRouter ---
         elif provider == "OpenRouter": 
             saved_key = user_keys.get("openrouter", "")
             env_key = os.getenv("OPENROUTER_API_KEY", "")
+            is_guest = st.session_state.get('is_guest', False)
             
-            if saved_key:
+            if saved_key and not is_guest:
                 api_key = saved_key
                 st.session_state.openrouter_client = configure_openrouter(api_key)
-                st.success("✅ OpenRouter Key (saved)")
+                st.success("✅ OpenRouter Ready")
+                st.session_state['using_free_tier'] = False
             elif env_key:
                 api_key = env_key
                 st.session_state.openrouter_client = configure_openrouter(api_key)
-                st.info("Using OpenRouter Key from Environment")
+                if is_guest:
+                    st.info("🆓 Free Tier (Guest) - Limited requests")
+                    st.session_state['using_free_tier'] = True
+                else:
+                    st.info("📦 Using Environment Key")
+                    st.session_state['using_free_tier'] = False
             else:
-                st.error("OpenRouter Key missing. Add one in ⚙️ API Key Settings below.")
+                st.error("❌ No OpenRouter Key. Add one in ⚙️ Settings.")
                 api_key = None
                 st.session_state.openrouter_client = configure_openrouter(None)
+                st.session_state['using_free_tier'] = False
     
             model_options = {
-                "xiaomi/mimo-v2-flash:free": "Xiaomi Mimo V2 Flash (Free)",
-                "google/gemini-2.0-flash-exp:free": "Gemini 2.0 Flash Exp (Free)",
-                "mistralai/devstral-2512:free": "Mistral Devstral 2512 (Free)",
-                "qwen/qwen3-coder:free": "Qwen 3 Coder (Free)",
-                "google/gemma-3-27b-it:free": "Gemma 3 27B IT (Free)"
+                "xiaomi/mimo-v2-flash:free": "Mimo V2 Flash",
+                "google/gemini-2.0-flash-exp:free": "Gemini 2.0 Flash",
+                "mistralai/devstral-2512:free": "Devstral",
+                "qwen/qwen3-coder:free": "Qwen 3 Coder",
+                "google/gemma-3-27b-it:free": "Gemma 3 27B"
             }
             summary_model = "google/gemini-2.0-flash-exp:free"
 
@@ -93,109 +118,73 @@ def render_sidebar():
         elif provider == "Z.AI":
             saved_key = user_keys.get("zai", "")
             env_key = os.getenv("ZAI_API_KEY", "")
+            is_guest = st.session_state.get('is_guest', False)
             
-            if saved_key:
+            if saved_key and not is_guest:
                 api_key = saved_key
                 st.session_state.zai_client = configure_zai(api_key)
-                st.success("✅ Z.AI Key (saved)")
+                st.success("✅ Z.AI Ready")
+                st.session_state['using_free_tier'] = False
             elif env_key:
                 api_key = env_key
                 st.session_state.zai_client = configure_zai(api_key)
-                st.info("Using Z.AI Key from Environment")
+                if is_guest:
+                    st.info("🆓 Free Tier (Guest) - Limited requests")
+                    st.session_state['using_free_tier'] = True
+                else:
+                    st.info("📦 Using Environment Key")
+                    st.session_state['using_free_tier'] = False
             else:
-                st.error("Z.AI Key missing. Add one in ⚙️ API Key Settings below.")
+                st.error("❌ No Z.AI Key. Add one in ⚙️ Settings.")
                 api_key = None
                 st.session_state.zai_client = configure_zai(None)
+                st.session_state['using_free_tier'] = False
             
             model_options = {
                 "GLM-4.7": "GLM-4.7 (Standard)",
-                "GLM-4.5-air": "GLM-4.5 Air (Lightweight)"
+                "GLM-4.5-air": "GLM-4.5 Air (Light)"
             }
             summary_model = "GLM-4.7"
         
         # --- Model Selection ---
+        st.markdown("##### 📦 Model")
         selected_model_key = st.selectbox(
             "Model", 
             options=list(model_options.keys()), 
             format_func=lambda x: model_options[x],
-            index=0
+            index=0,
+            label_visibility="collapsed"
         )
         model_name = selected_model_key
         
-        # --- API Key Settings Expander (for adding/changing keys) ---
+        st.divider()
+        
+        # Quick access settings (visual only, main settings are in modal)
         is_guest = st.session_state.get('is_guest', False)
         
-        if not is_guest:
-            with st.expander("⚙️ API Key Settings", expanded=False):
-                st.caption("Add or update your API keys here. Keys are saved securely to your profile.")
-                
-                # Google
-                st.markdown("[Get Gemini API Key](https://aistudio.google.com/app/api-keys)")
-                new_google_key = st.text_input("Gemini API Key", value="", type="password", key="new_google_key", placeholder="Enter new key...")
-                if new_google_key and st.button("💾 Save Gemini Key"):
-                    auth_manager.save_keys(email, {"google": new_google_key})
-                    st.session_state.user_keys["google"] = new_google_key
-                    st.success("Gemini Key saved!")
-                    st.rerun()
-                
-                st.divider()
-                
-                # OpenRouter
-                st.markdown("[Get OpenRouter Key](https://openrouter.ai/keys)")
-                new_openrouter_key = st.text_input("OpenRouter API Key", value="", type="password", key="new_openrouter_key", placeholder="Enter new key...")
-                if new_openrouter_key and st.button("💾 Save OpenRouter Key"):
-                    auth_manager.save_keys(email, {"openrouter": new_openrouter_key})
-                    st.session_state.user_keys["openrouter"] = new_openrouter_key
-                    st.success("OpenRouter Key saved!")
-                    st.rerun()
-                
-                st.divider()
-                
-                # Z.AI
-                st.markdown("[Get Z.AI API Key](https://z.ai/)")
-                new_zai_key = st.text_input("Z.AI API Key", value="", type="password", key="new_zai_key", placeholder="Enter new key...")
-                if new_zai_key and st.button("💾 Save Z.AI Key"):
-                    auth_manager.save_keys(email, {"zai": new_zai_key})
-                    st.session_state.user_keys["zai"] = new_zai_key
-                    st.success("Z.AI Key saved!")
-                    st.rerun()
-        else:
-            st.info("⚠️ Guest Mode: Keys are temporary. Log in to save keys.")
-
-        st.divider()
-        chunk_size = st.slider("Chunk Size (chars)", 5000, 20000, 10000, step=1000)
-        developer_mode = st.toggle("Developer Mode", value=False)
-        show_general_chat = st.toggle("Show General AI Chat", value=False, help="Enable the general AI chat panel on the right side")
+        if is_guest:
+            st.info("⚠️ Guest Mode")
         
-        # History Toggle (Logged-in only)
+        # Get settings from session state (set by settings modal)
+        chunk_size = st.session_state.get('chunk_size', 10000)
+        developer_mode = st.session_state.get('developer_mode', False)
+        anki_url = st.session_state.get('anki_connect_url') or os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
+        
+        # Legacy toggles for backward compatibility (hidden)
+        show_general_chat = False
         show_history = False
-        if email and email != "Guest":
-            show_history = st.toggle("📜 Show Card History", value=False, help="View and manage previously generated cards.")
-        elif email == "Guest":
-             st.caption("🔒 History disabled in Guest Mode")
-        
-        # AnkiConnect Configuration
-        st.divider()
-        with st.expander("🔗 AnkiConnect Settings", expanded=False):
-            st.caption("For local use, keep default. For Cloud, use a tunnel.")
-            anki_url = st.text_input(
-                "AnkiConnect URL", 
-                value=st.session_state.get('anki_connect_url') or os.getenv("ANKI_CONNECT_URL", "http://localhost:8765"),
-                help="Default: http://localhost:8765"
-            )
-            # Store/Update in session
-            st.session_state['anki_connect_url'] = anki_url
         
         st.divider()
+        
+        # Logout/Reset
         col_logout, col_clear = st.columns(2)
         with col_logout:
-            if st.button("🚪 Logout"):
+            if st.button("🚪 Logout", use_container_width=True):
                 st.session_state.clear()
                 st.rerun()
         
         with col_clear:
-             if st.button("🗑️ Reset"):
-                # specific clear logic if we want to keep login? No, reset usually kills everything.
+            if st.button("🗑️ Reset", use_container_width=True):
                 st.session_state.clear()
                 st.rerun()
 

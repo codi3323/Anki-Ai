@@ -1,10 +1,8 @@
 import streamlit as st
 import logging
+import os
 from dotenv import load_dotenv
 
-from components.session import init_session_state
-from components.sidebar import render_sidebar
-from components.generator import render_generator
 from components.session import init_session_state
 from components.sidebar import render_sidebar
 from components.generator import render_generator
@@ -12,6 +10,9 @@ from components.chat import render_pdf_chat, render_general_chat
 from components.login import render_login
 from components.onboarding import render_onboarding
 from components.history import render_history
+from components.header import render_header, render_settings_modal
+from components.standalone_chat import render_standalone_chat
+from components.cards_view import render_cards_view
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Versioning
-VERSION = "v2.5.1"
+VERSION = "v2.6.0"
 
 # Page Config
 st.set_page_config(
@@ -30,9 +31,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# Version Badge CSS
+# Custom CSS for the app
 st.markdown(f"""
     <style>
+    /* Version Badge */
     .version-badge {{
         position: fixed;
         top: 10px;
@@ -53,6 +55,53 @@ st.markdown(f"""
         color: rgba(255, 255, 255, 0.6);
         border: 1px solid rgba(255, 255, 255, 0.1);
     }}
+    
+    /* Hide Streamlit's default menu button (3 dots) */
+    #MainMenu {{
+        visibility: hidden;
+    }}
+    
+    /* Hide hamburger menu */
+    header[data-testid="stHeader"] {{
+        display: none;
+    }}
+    
+    /* Main container styling */
+    .main .block-container {{
+        padding-top: 2rem;
+        max-width: 1400px;
+    }}
+    
+    /* Button styling improvements */
+    .stButton > button {{
+        border-radius: 10px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }}
+    
+    .stButton > button:hover {{
+        transform: translateY(-1px);
+    }}
+    
+    /* Card styling */
+    .element-container {{
+        transition: all 0.2s ease;
+    }}
+    
+    /* Header styling */
+    h1 {{
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }}
+    
+    /* Divider styling */
+    hr {{
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+    }}
     </style>
     <div class="version-badge">{VERSION}</div>
 """, unsafe_allow_html=True)
@@ -69,16 +118,27 @@ if not st.session_state.get('is_logged_in', False):
     st.stop() # Stop execution here until logged in
 
 # --- Onboarding Flow ---
-# Check if keys are configured (either in session or environment)
-# We consider "configured" if at least one provider key exists or user explicitly skipped.
 if not st.session_state.get('keys_configured', False):
-    # Check if we already have keys in user profile (loaded during login)
     user_keys = st.session_state.get('user_keys', {})
+    is_guest = st.session_state.get('is_guest', False)
+    
+    # Check if environment keys are available for guests
+    has_env_keys = (
+        os.getenv("GOOGLE_API_KEY") or 
+        os.getenv("OPENROUTER_API_KEY") or 
+        os.getenv("ZAI_API_KEY")
+    )
+    
     if not user_keys:
-         render_onboarding()
-         st.stop()
+        if is_guest and has_env_keys:
+            # Guests can skip onboarding if environment keys are available
+            st.session_state['keys_configured'] = True
+            st.session_state['using_free_tier'] = True
+            st.rerun()
+        else:
+            render_onboarding()
+            st.stop()
     else:
-        # We have keys, mark as configured
         st.session_state['keys_configured'] = True
         st.rerun()
 
@@ -87,33 +147,41 @@ if not st.session_state.get('keys_configured', False):
 # Render Sidebar & Get Config
 config = render_sidebar()
 
-# Split View logic
+# Render Header with Navigation Icons
+render_header()
+
+# Render Settings Modal if open
+if st.session_state.get('show_settings_modal', False):
+    render_settings_modal(config)
+
+# Get current view
+current_view = st.session_state.get('current_view', 'generator')
+
+# --- Rate Limit Warning Banner ---
+if st.session_state.get('free_tier_rate_limited', False):
+    rate_msg = st.session_state.get('rate_limit_message', 'Rate limit reached on free tier.')
+    st.warning(f"⚠️ **Free Tier Rate Limited**: {rate_msg}\n\nYou're using the free shared API key. To avoid limits, add your own API key in Settings.")
+    # Reset after showing
+    st.session_state['free_tier_rate_limited'] = False
+    st.session_state['rate_limit_message'] = None
+
 st.divider()
-if config["show_general_chat"]:
-    col_gen, col_chat = st.columns([5, 4])
+
+# --- View Routing ---
+if current_view == 'chat':
+    # Full-screen chat view
+    render_standalone_chat()
+
+elif current_view == 'cards':
+    # Created cards view
+    render_cards_view()
+
 else:
-    col_gen = st.container()
-    col_chat = None
-
-# 1. Generator Column (or History)
-with col_gen:
-    if config.get("show_history"):
-        render_history()
-    else:
-        render_generator(config)
-
-# 2. Chat Column (Optional)
-if config["show_general_chat"] and col_chat is not None:
-    with col_chat:
-        render_general_chat(
-            config["show_general_chat"], 
-            config["provider"], 
-            config["model_name"]
-        )
-
-# We need to render PDF Chat if chapters exist.
-if 'chapters_data' in st.session_state and st.session_state['chapters_data']:
-    with col_gen:
+    # Default: Generator view
+    render_generator(config)
+    
+    # PDF Chat if chapters exist
+    if 'chapters_data' in st.session_state and st.session_state['chapters_data']:
         st.divider()
         render_pdf_chat(
             st.session_state['chapters_data'], 
