@@ -6,6 +6,9 @@ from utils.llm_handler import get_chat_response, configure_gemini, configure_ope
 from utils.pdf_processor import extract_text_from_pdf
 import os
 
+# Constants
+MAX_FILE_SIZE_MB = 50
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 def render_standalone_chat():
     """Renders the full standalone chat interface with model selector and upload."""
@@ -84,14 +87,25 @@ def render_standalone_chat():
         btn_type = "primary" if has_context else "secondary"
         
         with st.popover(label, use_container_width=True):
-            st.markdown("### Upload Context")
+            st.markdown(f"### Upload Context (Max {MAX_FILE_SIZE_MB}MB/file)")
             uploaded_files = st.file_uploader(
                 "Drag & drop PDF/TXT/MD files",
                 type=["pdf", "txt", "md"],
                 accept_multiple_files=True,
-                key="chat_file_upload"
+                key="chat_file_upload",
+                help=f"Individual files must be under {MAX_FILE_SIZE_MB}MB."
             )
             
+            # Validate file sizes
+            valid_files = []
+            if uploaded_files:
+                for f in uploaded_files:
+                    if f.size > MAX_FILE_SIZE_BYTES:
+                        st.warning(f"⚠️ {f.name} exceeds {MAX_FILE_SIZE_MB}MB limit and will be skipped.")
+                    else:
+                        valid_files.append(f)
+                uploaded_files = valid_files
+
             if st.button("🗑️ Clear Context", key="clear_context_pop"):
                 st.session_state.chat_context = ""
                 st.rerun()
@@ -100,13 +114,6 @@ def render_standalone_chat():
             if uploaded_files:
                 if 'processed_files_cache' not in st.session_state:
                     st.session_state.processed_files_cache = set()
-                
-                # Identify new files
-                current_file_names = {f.name for f in uploaded_files}
-                
-                # If selection changed or we don't have context, re-process
-                # Simple check: re-process if we have files.
-                # Ideally we append. For now, overwrite context with current batch is standard Streamlit behavior.
                 
                 context_texts = []
                 for file in uploaded_files:

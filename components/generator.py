@@ -265,7 +265,7 @@ def render_generator(config):
         
         base_deck_name = st.text_input("Base Deck Name", value=default_deck, help="The top-level deck name in Anki.")
 
-    uploaded_files = st.file_uploader("Upload Medical PDF(s)", type=["pdf"], accept_multiple_files=True, key="anki_uploader")
+    uploaded_files = st.file_uploader(f"Upload Medical PDF(s) (Max {MAX_FILE_SIZE_MB}MB/file)", type=["pdf"], accept_multiple_files=True, key="anki_uploader", help=f"Individual files must be under {MAX_FILE_SIZE_MB}MB.")
     
     # Validate file sizes
     valid_files = []
