@@ -12,6 +12,33 @@ logger = logging.getLogger(__name__)
 # Constants
 ANKICONNECT_TIMEOUT = 5  # seconds
 
+def check_ankiconnect() -> tuple[bool, str]:
+    """
+    Check if AnkiConnect is reachable.
+    Returns (is_reachable, error_message).
+    """
+    import os
+    anki_url = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
+    
+    try:
+        response = requests.post(
+            anki_url, 
+            json={"action": "version", "version": 6},
+            timeout=2
+        )
+        result = response.json()
+        if result.get("result"):
+            return True, f"AnkiConnect v{result['result']} running at {anki_url}"
+        return False, f"AnkiConnect responded but returned error: {result.get('error')}"
+    except requests.exceptions.ConnectionError:
+        if "localhost" in anki_url:
+            return False, "Cannot reach AnkiConnect at localhost:8765. If running on Streamlit Cloud, AnkiConnect only works when running the app locally. Download the cards and import manually, or run: streamlit run app.py"
+        return False, f"Cannot connect to AnkiConnect at {anki_url}"
+    except requests.exceptions.Timeout:
+        return False, "AnkiConnect request timed out"
+    except Exception as e:
+        return False, f"AnkiConnect check failed: {e}"
+
 def deduplicate_cards(new_cards: pd.DataFrame, existing_questions: list[str]) -> pd.DataFrame:
     """
     Filters out cards where the 'Front' is similar to existing questions.

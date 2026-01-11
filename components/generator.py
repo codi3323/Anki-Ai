@@ -6,7 +6,7 @@ import pandas as pd
 import logging
 from utils.pdf_processor import extract_text_from_pdf, clean_text, recursive_character_text_splitter
 from utils.llm_handler import process_chunk, generate_chapter_summary, detect_chapters_in_text, split_text_by_chapters
-from utils.data_processing import robust_csv_parse, push_card_to_anki, deduplicate_cards
+from utils.data_processing import robust_csv_parse, push_card_to_anki, deduplicate_cards, check_ankiconnect
 from utils.rag import SQLiteVectorStore
 
 logger = logging.getLogger(__name__)
@@ -254,20 +254,26 @@ def render_generator(config):
                 
                 with col_push:
                      if st.button("🚀 Push to Anki (AnkiConnect)"):
-                         success_count = 0
-                         total = len(st.session_state['result_df'])
-                         my_bar = st.progress(0)
-                         
-                         for i, row in st.session_state['result_df'].iterrows():
-                             tags = [row['Tag']] if row['Tag'] else []
-                             if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags):
-                                 success_count += 1
-                             my_bar.progress(min((i+1)/total, 1.0))
-                         
-                         if success_count > 0:
-                             st.success(f"Pushed {success_count}/{total} cards!")
+                         # Check connection first
+                         is_reachable, msg = check_ankiconnect()
+                         if not is_reachable:
+                             st.error(f"❌ {msg}")
                          else:
-                             st.warning("Failed to push. Ensure Anki is open and AnkiConnect is installed.")
+                             st.info(f"✅ {msg}")
+                             success_count = 0
+                             total = len(st.session_state['result_df'])
+                             my_bar = st.progress(0)
+                             
+                             for i, row in st.session_state['result_df'].iterrows():
+                                 tags = [row['Tag']] if row['Tag'] else []
+                                 if push_card_to_anki(row['Front'], row['Back'], row['Deck'], tags):
+                                     success_count += 1
+                                 my_bar.progress(min((i+1)/total, 1.0))
+                             
+                             if success_count > 0:
+                                 st.success(f"Pushed {success_count}/{total} cards!")
+                             else:
+                                 st.warning("Cards were not added. They may already exist in the deck.")
             
             st.divider()
             
