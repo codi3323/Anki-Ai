@@ -11,7 +11,7 @@ def render_onboarding():
     email = st.session_state.get('user_email')
     
     # Pre-fill with existing keys if any (partial setup)
-    current_keys = st.session_state.get('user_keys', {})
+    current_keys = st.session_state.get('user_keys') or {}
 
     with st.form("onboarding_form"):
         st.subheader("API Keys (Optional - fill at least one)")
