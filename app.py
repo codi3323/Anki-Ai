@@ -150,19 +150,17 @@ if not st.session_state.get('keys_configured', False):
 
 # --- Main App ---
 
-# Render Sidebar & Get Config
-config = render_sidebar()
+# Get current view
+current_view = st.session_state.get('current_view', 'generator')
 
-# Render Header with Navigation Icons
-# Moved to top of page
-# render_header()
+# Render Sidebar & Get Config (Skip in Chat Mode to avoid double controls)
+config = {}
+if current_view != 'chat':
+    config = render_sidebar()
 
 # Render Settings Modal if open
 if st.session_state.get('show_settings_modal', False):
     render_settings_modal(config)
-
-# Get current view
-current_view = st.session_state.get('current_view', 'generator')
 
 # --- Rate Limit Warning Banner ---
 if st.session_state.get('free_tier_rate_limited', False):
