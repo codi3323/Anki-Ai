@@ -155,6 +155,13 @@ def render_sidebar():
         developer_mode = st.toggle("Developer Mode", value=False)
         show_general_chat = st.toggle("Show General AI Chat", value=False, help="Enable the general AI chat panel on the right side")
         
+        # History Toggle (Logged-in only)
+        show_history = False
+        if email and email != "Guest":
+            show_history = st.toggle("📜 Show Card History", value=False, help="View and manage previously generated cards.")
+        elif email == "Guest":
+             st.caption("🔒 History disabled in Guest Mode")
+        
         # AnkiConnect Configuration
         st.divider()
         with st.expander("🔗 AnkiConnect Settings", expanded=False):
@@ -188,5 +195,6 @@ def render_sidebar():
         "chunk_size": chunk_size,
         "developer_mode": developer_mode,
         "show_general_chat": show_general_chat,
-        "anki_url": anki_url
+        "anki_url": anki_url,
+        "show_history": show_history
     }

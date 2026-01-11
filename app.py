@@ -5,9 +5,13 @@ from dotenv import load_dotenv
 from components.session import init_session_state
 from components.sidebar import render_sidebar
 from components.generator import render_generator
+from components.session import init_session_state
+from components.sidebar import render_sidebar
+from components.generator import render_generator
 from components.chat import render_pdf_chat, render_general_chat
 from components.login import render_login
 from components.onboarding import render_onboarding
+from components.history import render_history
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -91,9 +95,12 @@ else:
     col_gen = st.container()
     col_chat = None
 
-# 1. Generator Column
+# 1. Generator Column (or History)
 with col_gen:
-    render_generator(config)
+    if config.get("show_history"):
+        render_history()
+    else:
+        render_generator(config)
 
 # 2. Chat Column (Optional)
 if config["show_general_chat"] and col_chat is not None:

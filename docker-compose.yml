@@ -1,13 +1,29 @@
 services:
   anki-ai:
     build: .
+    container_name: anki-ai
+    restart: unless-stopped
     ports:
       - "8501:8501"
     volumes:
-      - .:/app
+      - ./data:/app/data
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONIOENCODING=UTF-8
-    # Interactive mode for debugging
-    stdin_open: true
-    tty: true
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8501/_stcore/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: anki-tunnel
+    restart: unless-stopped
+    command: tunnel --url http://anki-ai:8501
+    depends_on:
+      anki-ai:
+        condition: service_healthy
