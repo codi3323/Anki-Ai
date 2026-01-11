@@ -127,6 +127,29 @@ def render_settings_modal(config):
     </style>
     """, unsafe_allow_html=True)
     
+    # Helper to save preferences
+    def persist_preferences():
+        if not email: return
+        
+        # Consolidation from session keys or direct widget keys
+        prefs = {
+            "provider": st.session_state.get('settings_default_provider') or st.session_state.get('default_provider'),
+            "model_name": st.session_state.get('settings_default_model') or st.session_state.get('default_model'),
+            "chunk_size": st.session_state.get('settings_chunk_size') or st.session_state.get('chunk_size'),
+            "theme_mode": st.session_state.get('theme_mode'),
+            "anki_connect_url": st.session_state.get('settings_anki_url') or st.session_state.get('anki_connect_url'),
+            "developer_mode": st.session_state.get('developer_mode')
+        }
+        # Clean None
+        prefs = {k: v for k, v in prefs.items() if v is not None}
+        auth_manager.save_preferences(email, prefs)
+        
+        # update main session keys to match
+        if prefs.get('provider'): st.session_state['default_provider'] = prefs['provider']
+        if prefs.get('model_name'): st.session_state['default_model'] = prefs['model_name']
+        if prefs.get('chunk_size'): st.session_state['chunk_size'] = prefs['chunk_size']
+        if prefs.get('anki_connect_url'): st.session_state['anki_connect_url'] = prefs['anki_connect_url']
+
     # We use a container that acts as a dialog
     with st.expander("⚙️ Application Settings", expanded=True):
         st.caption("Press 'Close' to save and exit.")
@@ -144,7 +167,8 @@ def render_settings_modal(config):
                 "Default AI Provider",
                 providers,
                 index=current_provider_idx,
-                key="settings_default_provider"
+                key="settings_default_provider",
+                on_change=persist_preferences
             )
             st.session_state['default_provider'] = default_provider
             
@@ -179,17 +203,33 @@ def render_settings_modal(config):
                 model_keys,
                 format_func=lambda x: model_options[x],
                 index=current_model_idx,
-                key="settings_default_model"
+                key="settings_default_model",
+                on_change=persist_preferences
             )
             st.session_state['default_model'] = default_model
             
             st.divider()
             
             st.markdown("##### Other Preferences")
-            chunk_size = st.slider("Chunk Size", 5000, 20000, st.session_state.get('chunk_size', 10000), 1000)
+            chunk_size = st.slider(
+                "Chunk Size", 
+                5000, 
+                20000, 
+                st.session_state.get('chunk_size', 10000), 
+                1000,
+                key="settings_chunk_size",
+                on_change=persist_preferences
+            )
             st.session_state['chunk_size'] = chunk_size
             
-            theme = st.radio("Theme Mode", ["Dark", "Light"], horizontal=True, index=0 if st.session_state.get('theme_mode', 'dark') == 'dark' else 1)
+            theme = st.radio(
+                "Theme Mode", 
+                ["Dark", "Light"], 
+                horizontal=True, 
+                index=0 if st.session_state.get('theme_mode', 'dark') == 'dark' else 1,
+                key="settings_theme_mode",
+                on_change=persist_preferences
+            )
             st.session_state['theme_mode'] = theme.lower()
             
         with tab_api:
@@ -246,7 +286,12 @@ def render_settings_modal(config):
         
         with tab_anki:
             current_url = st.session_state.get('anki_connect_url') or os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
-            new_url = st.text_input("AnkiConnect URL", value=current_url)
+            new_url = st.text_input(
+                "AnkiConnect URL", 
+                value=current_url,
+                key="settings_anki_url",
+                on_change=persist_preferences
+            )
             st.session_state['anki_connect_url'] = new_url
 
         if st.button("✕ Close Settings", use_container_width=True):

@@ -61,9 +61,9 @@ st.markdown(f"""
         visibility: hidden;
     }}
     
-    /* Hide hamburger menu */
+    /* Header adjustment to keep hamburger visible */
     header[data-testid="stHeader"] {{
-        display: none;
+        background-color: transparent;
     }}
     
     /* Main container styling */
@@ -164,6 +164,17 @@ if not st.session_state.get('is_logged_in', False):
             st.session_state['user_email'] = found_email
             st.session_state['user_keys'] = auth_manager.get_keys(found_email) # Decrypt keys
             st.session_state['is_guest'] = False
+            
+            # Load preferences
+            prefs = auth_manager.get_preferences(found_email)
+            if prefs:
+                st.session_state['default_provider'] = prefs.get('provider')
+                st.session_state['model_name'] = prefs.get('model_name')
+                st.session_state['summary_model'] = prefs.get('summary_model')
+                st.session_state['chunk_size'] = prefs.get('chunk_size')
+                st.session_state['developer_mode'] = prefs.get('developer_mode')
+            
+            logger.info(f"Auto-logged in as {found_email}")
             
             # Init empty defaults if needed
             if 'chapters_data' not in st.session_state: st.session_state['chapters_data'] = []

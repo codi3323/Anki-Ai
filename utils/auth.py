@@ -515,3 +515,31 @@ class UserManager:
             del data[email]["sessions"][token]
             self._save_data(data)
 
+    def get_preferences(self, email):
+        """
+        Retrieves user preferences.
+        Returns a dict of preferences or empty dict if none found.
+        """
+        data = self._load_data()
+        if email not in data:
+            return {}
+            
+        return data[email].get("preferences", {})
+
+    def save_preferences(self, email, preferences):
+        """
+        Saves user preferences (merged with existing).
+        preferences: dict of settings
+        """
+        data = self._load_data()
+        if email not in data:
+            return False
+            
+        current_prefs = data[email].get("preferences", {})
+        current_prefs.update(preferences)
+        data[email]["preferences"] = current_prefs
+        
+        self._save_data(data)
+        logger.info(f"Updated preferences for {email}: {preferences.keys()}")
+        return True
+

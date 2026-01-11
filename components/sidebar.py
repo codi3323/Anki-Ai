@@ -15,6 +15,21 @@ def render_sidebar(cookie_manager=None):
     email = st.session_state.get('user_email')
     user_keys = st.session_state.get('user_keys') or {}
 
+    # Helper to save preferences
+    def persist_preferences():
+        if not email: return
+        
+        prefs = {
+            "provider": st.session_state.get('sidebar_provider'),
+            "model_name": st.session_state.get('sidebar_model'),
+            "summary_model": st.session_state.get('sidebar_summary_model'),
+            "chunk_size": st.session_state.get('chunk_size'),
+            "developer_mode": st.session_state.get('developer_mode')
+        }
+        # Filter None
+        prefs = {k: v for k, v in prefs.items() if v is not None}
+        auth_manager.save_preferences(email, prefs)
+
     with st.sidebar:
         # User info
 
@@ -34,7 +49,8 @@ def render_sidebar(cookie_manager=None):
             providers, 
             index=default_idx,
             label_visibility="collapsed",
-            key="sidebar_provider"
+            key="sidebar_provider",
+            on_change=persist_preferences
         )
         
         api_key = None
@@ -158,7 +174,8 @@ def render_sidebar(cookie_manager=None):
         model_keys = list(model_options.keys())
         
         # Use default model if provider matches and model is valid
-        default_model = st.session_state.get('default_model', model_keys[0])
+        # Prefer 'model_name' (from prefs) over 'default_model'
+        default_model = st.session_state.get('model_name') or st.session_state.get('default_model') or model_keys[0]
         default_model_idx = model_keys.index(default_model) if default_model in model_keys else 0
         
         selected_model_key = st.selectbox(
@@ -167,7 +184,8 @@ def render_sidebar(cookie_manager=None):
             format_func=lambda x: model_options[x],
             index=default_model_idx,
             label_visibility="collapsed",
-            key="sidebar_model"
+            key="sidebar_model",
+            on_change=persist_preferences
         )
         model_name = selected_model_key
         
