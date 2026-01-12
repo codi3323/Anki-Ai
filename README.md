@@ -11,6 +11,7 @@ A powerful AI-powered tool that converts medical PDFs into high-yield Anki flash
 
 ## Table of Contents
 
+- [Documentation](#-documentation)
 - [Features](#-features)
 - [Quick Start](#-quick-start)
 - [Configuration](#-configuration)
@@ -21,6 +22,21 @@ A powerful AI-powered tool that converts medical PDFs into high-yield Anki flash
 - [Usage Guide](#-usage-guide)
 - [Settings Reference](#-settings-reference)
 - [Troubleshooting](#-troubleshooting)
+
+---
+
+## Documentation
+
+For detailed documentation beyond this README, see the [docs/](docs/) folder:
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/ARCHITECTURE.md) | System architecture, components, data flow, and technology stack |
+| [Components](docs/COMPONENTS.md) | Detailed documentation for all UI components and utilities |
+| [API Reference](docs/API.md) | LLM provider APIs, AnkiConnect integration, and internal APIs |
+| [Developer Guide](docs/DEVELOPER.md) | Development environment setup, coding standards, and debugging |
+| [Deployment Guide](docs/DEPLOYMENT.md) | Docker deployment, Cloudflare tunnel, and production setup |
+| [Contributing](docs/CONTRIBUTING.md) | Guidelines for contributing to the project |
 
 ---
 
