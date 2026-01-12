@@ -7,7 +7,9 @@
       "Bash(git push:*)",
       "Bash(python:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(find:*)",
+      "Bash(gh auth:*)"
     ]
   }
 }

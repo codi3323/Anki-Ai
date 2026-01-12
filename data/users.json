@@ -1,0 +1,24 @@
+{
+    "thies.schuelken@gmail.com": {
+        "password_hash": "$2b$12$0HELHtHRkYbaMYJI81LAE.UA7RDUoulITjg4yKN8AkWD6y2/S2PK6",
+        "api_keys": {
+            "google": "enc:gAAAAABpZALrpifAFiqq6PxxyLJ4TpdY7mRZPOmuS1zd3XwWgMN1zPQdBuSVQjZEXOfxQLpGt-glw3Z9J83zRUZB0EyepE35gOWjbCbMlzfdOHG3Sn-Z0v6o4NzKwEbD_nrwFeCetUpL",
+            "zai": "enc:gAAAAABpZALrtGEnbcCKrcHbAIK0iDIrGGCkro7LCRcBiISnQUYAbagj9aBq3LcVAQ9QDet4rW5UBnuIv7c0Pwd8N4OXT9wK_my7gjARESXWz2B0ajOvGs5f_s_3yK4LDO5hzre9TLzDJsZphk445D4VChMMD2z9iw==",
+            "openrouter": "enc:gAAAAABpZALrgLJlyUGDTrZdX3shIqr9T3myEqynNw4-GQGZ55wUaVDjUdmBez0oE1EV0agb2A5cvyVyj1knOp2C8w6PDdgxYWlTAoClrBUSEci8CD8ju_cjPL_gYOSmSIq7BXB0Y3_kvL684SSANjulpWH2ushmHj3B-dHg5m88QpFaef0Mh78="
+        },
+        "reset_code": "3439d1ab026e0f27f176192b7ba7745fdaca4205693b88c05773f421a884ab43",
+        "reset_expiry": 1768157303.4713554,
+        "sessions": {
+            "N_1k0JQ5y81j3bIkQjBFTpCoSKJ0YdICe6vcMFl2bB8": 1770753281.7197018,
+            "W0B-j7Kfx4nRNH7yhbgMNaUO1XssTw61azcWvWIShPs": 1770753450.9444234,
+            "RWbd9JpjsIVlXBF-4rFk9nlLAwXXaXd2SGFUEnnnwG0": 1770753525.0037677
+        },
+        "preferences": {
+            "provider": "Z.AI",
+            "model_name": "GLM-4.7",
+            "chunk_size": 20000,
+            "theme_mode": "dark",
+            "anki_connect_url": "http://localhost:8765"
+        }
+    }
+}
