@@ -180,8 +180,8 @@ def render_deck_node(node_key, node, level=0):
             st.caption(meta_text)
 
         with c2:
-            # Actions
-            ac1, ac2 = st.columns(2)
+            # Actions - 3 columns for CSV, Push, Delete
+            ac1, ac2, ac3 = st.columns(3)
             with ac1:
                 # CSV Download (Aggregate)
                 csv = node['total_df'].to_csv(index=False)
@@ -197,6 +197,22 @@ def render_deck_node(node_key, node, level=0):
                  # Push (Aggregate)
                  if st.button("📤 Push", key=f"push_{full_name}", help="Push this deck and all subdecks to Anki"):
                      push_deck_tree(node)
+            with ac3:
+                 # Delete Deck
+                 delete_key = f"delete_{full_name}"
+                 confirm_key = f"confirm_delete_{full_name}"
+                 if st.session_state.get(confirm_key):
+                     if st.button("⚠️ Confirm", key=f"confirm_btn_{full_name}", type="primary"):
+                         email = st.session_state.get('user_email', 'Guest')
+                         history_manager = CardHistory()
+                         deleted = history_manager.delete_deck(email, full_name, include_subdecks=True)
+                         st.session_state[confirm_key] = False
+                         st.toast(f"🗑️ Deleted {deleted} cards from '{full_name}'")
+                         st.rerun()
+                 else:
+                     if st.button("🗑️ Delete", key=delete_key, help="Delete this deck and all subdecks"):
+                         st.session_state[confirm_key] = True
+                         st.rerun()
             
             with ac1:
                  # Browser Push

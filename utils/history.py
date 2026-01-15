@@ -90,3 +90,36 @@ class CardHistory:
     def get_card_count(self, email) -> int:
         """Returns the total number of cards in history."""
         return len(self._load_history(email))
+
+    def delete_deck(self, email, deck_name: str, include_subdecks: bool = True) -> int:
+        """
+        Deletes all cards from a specific deck.
+        
+        Args:
+            email: User's email
+            deck_name: Name of the deck to delete
+            include_subdecks: If True, also deletes cards from subdecks (e.g., "Anatomy::Heart")
+        
+        Returns:
+            Number of cards deleted
+        """
+        history = self._load_history(email)
+        original_count = len(history)
+        
+        if include_subdecks:
+            # Delete cards from this deck and all subdecks (deck names starting with "deck_name::")
+            filtered_history = [
+                card for card in history 
+                if card.get('deck') != deck_name and not card.get('deck', '').startswith(f"{deck_name}::")
+            ]
+        else:
+            # Delete only cards from this exact deck
+            filtered_history = [card for card in history if card.get('deck') != deck_name]
+        
+        deleted_count = original_count - len(filtered_history)
+        
+        if deleted_count > 0:
+            self._save_history(email, filtered_history)
+            logger.info(f"Deleted {deleted_count} cards from deck '{deck_name}' for {email}")
+        
+        return deleted_count
