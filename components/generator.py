@@ -299,7 +299,7 @@ def _generate_cards(provider, model_name, chunk_size, card_length, card_density,
             final_df = final_df[["Front", "Back", "Deck", "Tag"]]
             st.session_state['result_df'] = final_df
             # Create proper Anki TSV with header comments
-            anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
+            anki_header = "#separator:tab\n#html:true\n#deck column:3\n#tags column:4\n"
             tsv_content = final_df.to_csv(sep="\t", index=False, header=False, quoting=1)
             st.session_state['result_csv'] = anki_header + tsv_content
             st.success(f"Generated {len(final_df)} cards!")
@@ -579,7 +579,7 @@ def render_generator(config):
                                 safe_base_deck = _sanitize_deck_name(base_deck_name)
                                 df_single["Deck"] = f"{safe_base_deck}::{clean_title}"
                                 df_single["Tag"] = clean_title
-                                anki_header = "#separator:tab\n#deck column:3\n#tags column:4\n"
+                                anki_header = "#separator:tab\n#html:true\n#deck column:3\n#tags column:4\n"
                                 single_tsv = anki_header + df_single.to_csv(sep="\t", index=False, header=False, quoting=1)
                                 
                                 # Store in session state to persist

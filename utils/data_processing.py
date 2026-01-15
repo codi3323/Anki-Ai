@@ -113,7 +113,8 @@ def push_card_to_anki(front: str, back: str, deck: str, tags: list = None, anki_
         },
         "options": {
             "allowDuplicate": False,
-            "duplicateScope": "deck"
+            "duplicateScope": "deck",
+            "allowHtml": True
         },
         "tags": tags
     }
@@ -158,7 +159,8 @@ def format_cards_for_ankiconnect(df: pd.DataFrame) -> list:
             },
             "options": {
                 "allowDuplicate": False,
-                "duplicateScope": "deck"
+                "duplicateScope": "deck",
+                "allowHtml": True
             },
             "tags": [str(row['Tag'])] if row['Tag'] else []
         })
