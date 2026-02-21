@@ -61,11 +61,14 @@ def deduplicate_cards(new_cards: pd.DataFrame, existing_questions: list[str]) ->
     Filters out cards where the 'Front' is similar to existing questions.
     Uses simple exact match or normalized match for now to avoid overhead.
     """
-    if new_cards.empty or not existing_questions:
+    if new_cards.empty:
         return new_cards
         
     # Normalize existing for comparison (lowercase, stripped)
-    existing_set = {q.lower().strip() for q in existing_questions}
+    if existing_questions:
+        existing_set = {q.lower().strip() for q in existing_questions}
+    else:
+        existing_set = set()
     
     # Filter
     unique_indices = []
